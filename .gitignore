@@ -1,0 +1,10 @@
+.env
+field_notes.db
+journal.db
+uploads/
+documents/
+email_notifications.log
+__pycache__/
+*.pyc
+.claude/
+.kilo/

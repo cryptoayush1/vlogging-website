@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Notes Studio</title><link rel="stylesheet" href="admin.css"></head>
+<body>
+  <main class="auth-shell" id="loginView"><section class="auth-card"><div class="brand-mark">FIELD<br><span>NOTES</span></div><p class="kicker">Private studio</p><h1>Welcome back.</h1><p class="muted">Sign in to publish a new vlog to the Field Notes journal.</p><form id="loginForm"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="primary" type="submit">Enter studio <span>↗</span></button><p class="form-error" id="loginError"></p></form><button type="button" class="secondary-button" id="registerButton">Register</button><a class="back-link" href="/">← Return to public site</a></section></main>
+  <main class="auth-shell hidden" id="registerView"><section class="auth-card"><div class="brand-mark">FIELD<br><span>NOTES</span></div><p class="kicker">Create access</p><h1>Register.</h1><p class="muted">Create a co-admin account. The administrator controls final access.</p><form id="registerForm"><label>Username<input name="username" minlength="3" required></label><label>Gmail<input type="email" name="email" placeholder="you@gmail.com" required></label><label>Password<input type="password" name="password" minlength="8" required></label><label>Repeat password<input type="password" name="repeat_password" minlength="8" required></label><label>Account type<select name="role"><option value="admin">Admin</option><option value="coadmin">Co-admin</option></select></label><button class="primary" type="submit">Verify & register <span>↗</span></button><p class="form-error" id="registerError"></p></form><button type="button" class="back-link" id="backToLogin">← Back to login</button></section></main>
+  <main class="dashboard-shell hidden" id="dashboardView">
+    <header class="dash-header">
+      <div class="dash-header-left">
+        <a class="brand-mark" href="/">FIELD<br><span>NOTES</span></a>
+        <nav class="dash-tabs" id="dashTabs">
+          <button type="button" class="dash-tab active" id="tabWorkspace">Publications</button>
+          <button type="button" class="dash-tab" id="tabAnalytics" style="display:none">Analytics & Feedback</button>
+        </nav>
+      </div>
+      <div class="header-right">
+        <span id="accountLabel">Private studio</span>
+        <button id="logoutButton">Log out</button>
+      </div>
+    </header>
+    <section class="dashboard-content">
+      <div id="workspaceView">
+        <div class="dash-intro">
+          <div>
+            <p class="kicker">Editorial workspace</p>
+            <h1>Good work,<br><em>made visible.</em></h1>
+          </div>
+          <span class="status-dot">● Studio online</span>
+        </div>
+        <div class="stats">
+          <div><b id="vlogCount">0</b><span>Published films</span></div>
+          <div><b>1,500</b><span>Word limit</span></div>
+          <div><b>DOCX</b><span>Accepted format</span></div>
+        </div>
+        <div class="workspace">
+          <section class="panel">
+            <div class="panel-title">
+              <div><p class="kicker">New publication</p><h2>Upload a vlog</h2></div>
+              <span class="step">01 / 01</span>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+              <div class="two-col">
+                <label>Title<input name="title" required placeholder="A thoughtful title"></label>
+                <label>Category
+                  <select name="category">
+                    <option>Culture</option>
+                    <option>Places</option>
+                    <option>People</option>
+                    <option>Process</option>
+                  </select>
+                </label>
+              </div>
+              <label>Author<input name="author" required placeholder="Byline"></label>
+              <label>Excerpt<textarea name="excerpt" rows="3" required placeholder="A short description for the journal card"></textarea></label>
+              <label class="file-drop" id="docDrop">
+                <input type="file" name="document" accept=".doc,.docx" required>
+                <strong>Choose a Word document</strong>
+                <span>DOC or DOCX · maximum 1,500 words · 10 MB</span>
+              </label>
+
+              <label class="file-drop image-drop" id="thumbnailDrop" style="margin-top:16px">
+                <input type="file" name="thumbnail" id="thumbnailInput" accept="image/jpeg,.jpg,.jpeg">
+                <strong>Choose a Vlog Thumbnail Picture</strong>
+                <span>JPEG only · Maximum 250 KB · Displayed on public site</span>
+              </label>
+              <div id="thumbnailPreview" class="upload-preview hidden"></div>
+              <button class="primary" type="submit">Publish to journal <span>↗</span></button>
+              <p class="form-error" id="uploadError"></p>
+              <p class="form-success" id="uploadSuccess"></p>
+            </form>
+          </section>
+          <aside class="panel recent">
+            <div class="panel-title">
+              <div><p class="kicker">The archive</p><h2>Recent films</h2></div>
+            </div>
+            <div id="recentList"><p class="muted">No uploaded films yet.</p></div>
+          </aside>
+        </div>
+      </div>
+
+      <div id="analyticsView" class="hidden">
+        <div class="dash-intro">
+          <div>
+            <p class="kicker">Admin Intelligence</p>
+            <h1>Audience,<br><em>reach & feedback.</em></h1>
+          </div>
+          <div class="analytics-actions">
+            <button type="button" class="secondary-button" id="refreshAnalyticsBtn" style="width:auto;margin:0;padding:10px 18px">↻ Refresh data</button>
+          </div>
+        </div>
+
+        <div class="stats analytics-kpis">
+          <div><b id="metricViews">0</b><span>Total Website Views</span></div>
+          <div><b id="metricClicks">0</b><span>Total Vlog Reads / Clicks</span></div>
+          <div><b id="metricVisitors">0</b><span>Unique Visitors Tracked</span></div>
+          <div><b id="metricFeedback">0</b><span>Reader Reflections</span></div>
+        </div>
+
+        <section class="panel analytics-panel">
+          <div class="panel-title">
+            <div>
+              <p class="kicker">Performance Insights</p>
+              <h2>Graphical Analytics by Published Vlog</h2>
+            </div>
+            <span class="status-dot live-pulse" id="liveSyncStatus">● Live active (2s auto-sync)</span>
+          </div>
+          <p class="muted" style="margin-top:-10px;margin-bottom:24px">Visual comparison of clicks (readership) and reader reflections for every published vlog in the journal.</p>
+          <div id="vlogChartsContainer" class="vlog-charts-list">
+            <p class="muted">Loading graphical analytics…</p>
+          </div>
+        </section>
+
+        <section class="panel analytics-panel" style="margin-top:28px">
+          <div class="panel-title">
+            <div>
+              <p class="kicker">Audience Reflections</p>
+              <h2>Feedback by Published Article</h2>
+            </div>
+            <span id="feedbackCountBadge" class="status-dot">0 Reflections</span>
+          </div>
+          <p class="muted" style="margin-top:-10px;margin-bottom:20px">Read reflections left by visitors. As the primary administrator, you can moderate and delete any feedback item.</p>
+          <div id="feedbackTableContainer" class="feedback-table-wrapper">
+            <p class="muted">Loading feedback…</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main><script src="admin.js"></script>
+</body></html>
