@@ -70,6 +70,18 @@ function setupAdminAnalytics(){
     if(refreshBtn){
       refreshBtn.addEventListener('click',()=>loadAnalytics(false));
     }
+    const resetBtn = document.querySelector('#resetAnalyticsBtn');
+    if(resetBtn){
+      resetBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to reset all analytics counters to 0?')) return;
+        try {
+          await api('/api/admin/analytics/reset', { method: 'POST' });
+          await loadAnalytics(false);
+        } catch (e) {
+          alert('Could not reset analytics: ' + (e.message || 'Error'));
+        }
+      });
+    }
   }
 }
 

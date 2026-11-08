@@ -149,5 +149,15 @@ class AnalyticsFeatureTests(unittest.TestCase):
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM feedback WHERE vlog_id=? OR vlog_title=?", (v_id, v_title)).fetchone()[0], 0)
         self.assertIsNone(self.conn.execute("SELECT id FROM vlogs WHERE id=?", (v_id,)).fetchone())
 
+    def test_reset_analytics_wipes_all_events(self):
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash) VALUES('page_view', 'ip1')")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash) VALUES('vlog_click', 'ip2')")
+        self.conn.commit()
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM analytics_events").fetchone()[0], 2)
+
+        self.conn.execute("DELETE FROM analytics_events")
+        self.conn.commit()
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM analytics_events").fetchone()[0], 0)
+
 if __name__ == '__main__':
     unittest.main()

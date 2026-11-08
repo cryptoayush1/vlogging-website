@@ -852,6 +852,13 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute('DELETE FROM feedback WHERE id=?', (fb_id,))
                 conn.commit()
             return self.send_json(200, {'deleted': True, 'id': fb_id})
+        if parsed.path == '/api/admin/analytics/reset' and self.command == 'POST':
+            if not self.require_role('admin'):
+                return self.send_json(403, {'error': 'Only the admin can reset analytics.'})
+            with db() as conn:
+                conn.execute('DELETE FROM analytics_events')
+                conn.commit()
+            return self.send_json(200, {'reset': True})
         return self.send_json(404, {'error': 'Not found.'})
 
     def do_DELETE(self):
