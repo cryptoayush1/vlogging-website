@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR_RENDER_URL.onrender.com/api/:path*"
+      "destination": "https://vlogging-website.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://YOUR_RENDER_URL.onrender.com/uploads/:path*"
+      "destination": "https://vlogging-website.onrender.com/uploads/:path*"
     }
   ]
 }
