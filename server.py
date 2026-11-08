@@ -507,6 +507,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         cleanup_expired_sessions()
         parsed = urlparse(self.path)
+        if parsed.path in ('/', '') and (os.getenv('RENDER') or os.getenv('RENDER_EXTERNAL_URL') or os.getenv('ADMIN_PORTAL_ONLY')):
+            self.send_response(302)
+            self.send_header('Location', '/admin/')
+            self.end_headers()
+            return
         if parsed.path == '/api/vlogs':
             with db() as conn: rows = [dict(row) for row in conn.execute('SELECT * FROM vlogs ORDER BY created_at DESC')]
             return self.send_json(200, rows)
