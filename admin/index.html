@@ -60,13 +60,13 @@
                 <span>DOC or DOCX · Maximum file size 5 MB</span>
               </label>
 
-              <div id="docPreviewContainer" class="upload-preview hidden" style="margin-top:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <span class="kicker" style="margin:0;">Editable Document Preview</span>
+              <div id="docPreviewContainer" class="hidden" style="margin-top:19px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <label for="docPreviewText" style="margin:0;font-weight:600;">Editable Document Preview</label>
                   <span id="docPreviewWordCount" style="font-size:12px;color:var(--muted);font-weight:600;">0 / 6,000 words</span>
                 </div>
-                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="width:100%;resize:vertical;min-height:160px;font-family:inherit;font-size:14px;line-height:1.6;padding:12px;border:1px solid var(--line);border-radius:4px;background:#fbfbf9;color:var(--ink);"></textarea>
-                <small style="color:var(--muted);display:block;margin-top:6px;">Adjustable textbox · Edits made here will be published into the vlog · Max 6,000 words</small>
+                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="resize:vertical;min-height:140px;line-height:1.6;font-family:inherit;"></textarea>
+                <small style="color:var(--muted);display:block;margin-top:6px;font-size:11px;">Adjustable textbox (drag bottom-right corner to resize) · Edits will be published into the vlog · Max 6,000 words</small>
               </div>
 
               <label class="file-drop image-drop" id="authorImageDrop" style="margin-top:16px">
