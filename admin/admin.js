@@ -74,12 +74,22 @@ function setupAdminAnalytics(){
     const resetBtn = document.querySelector('#resetAnalyticsBtn');
     if(resetBtn){
       resetBtn.addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to reset all analytics counters to 0?')) return;
+        const input = prompt('WARNING: This will permanently reset all analytics page views, clicks, and visitor counters to 0.\n\nType RESET in capital letters to confirm:');
+        if (input !== 'RESET') {
+          if (input !== null) alert('Action cancelled — you must type "RESET" exactly to reset metrics.');
+          return;
+        }
         try {
+          resetBtn.disabled = true;
+          resetBtn.textContent = 'Resetting…';
           await api('/api/admin/analytics/reset', { method: 'POST' });
           await loadAnalytics(false);
+          alert('Analytics metrics have been reset to 0.');
         } catch (e) {
           alert('Could not reset analytics: ' + (e.message || 'Error'));
+        } finally {
+          resetBtn.disabled = false;
+          resetBtn.textContent = '↺ Reset metrics to 0';
         }
       });
     }

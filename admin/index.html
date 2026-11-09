@@ -118,7 +118,6 @@
           </div>
           <div class="analytics-actions" style="display:flex;gap:10px;align-items:center">
             <button type="button" class="secondary-button" id="refreshAnalyticsBtn" style="width:auto;margin:0;padding:10px 18px">↻ Refresh data</button>
-            <button type="button" class="secondary-button" id="resetAnalyticsBtn" style="width:auto;margin:0;padding:10px 18px;color:#c0392b;border-color:rgba(192,57,43,0.3)">↺ Reset metrics to 0</button>
           </div>
         </div>
 
@@ -156,6 +155,19 @@
             <p class="muted">Loading feedback…</p>
           </div>
         </section>
+
+        <details class="danger-zone-details" style="margin-top:40px;margin-bottom:24px;padding:16px 20px;border:1px solid rgba(192,57,43,0.25);border-radius:6px;background:rgba(192,57,43,0.02);">
+          <summary style="cursor:pointer;font-weight:600;font-size:12px;color:#8a2a1e;user-select:none;outline:none;">
+            ⚙️ Danger Zone — Advanced Analytics Management
+          </summary>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px dashed rgba(192,57,43,0.2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
+            <div>
+              <strong style="display:block;font-size:13px;color:var(--ink);">Reset Analytics Counters</strong>
+              <small style="color:var(--muted);font-size:12px;">Permanently reset website page views, clicks, and visitor counters to 0. (Requires typing &quot;RESET&quot; to confirm).</small>
+            </div>
+            <button type="button" class="secondary-button" id="resetAnalyticsBtn" style="width:auto;margin:0;padding:8px 16px;font-size:12px;color:#c0392b;border-color:rgba(192,57,43,0.4);background:#fff;border-radius:4px;">↺ Reset metrics to 0</button>
+          </div>
+        </details>
       </div>
     </section>
   </main><script src="admin.js"></script>
