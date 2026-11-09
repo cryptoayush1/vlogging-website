@@ -55,11 +55,11 @@ def load_dotenv():
 
 load_dotenv()
 
-SMTP_USER = os.getenv('SMTP_USER', '')
-SMTP_PASS = os.getenv('SMTP_PASS', '').replace(' ', '')
-SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com' if '@gmail.com' in SMTP_USER else '')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
-SMTP_FROM = os.getenv('SMTP_FROM', '') or (SMTP_USER or 'bot@fieldnotes.local')
+SMTP_USER = os.getenv('SMTP_USER', 'vlogingwebsite@gmail.com')
+SMTP_PASS = os.getenv('SMTP_PASS', 'uxendqgrtentfkzh').replace(' ', '')
+SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
+SMTP_FROM = os.getenv('SMTP_FROM', '') or (SMTP_USER or 'vlogingwebsite@gmail.com')
 SENT_EMAILS: list[dict] = []
 EMAIL_LOG_PATH = ROOT / 'email_notifications.log'
 
@@ -73,6 +73,9 @@ def send_bot_email(to_email: str, subject: str, body: str):
         'sent_via_smtp': False,
         'error': None
     }
+    with LOCK:
+        SENT_EMAILS.append(record)
+
     print(f"\n==================== [BOT EMAIL NOTIFICATION] ====================", flush=True)
     print(f"TO: {to_email}", flush=True)
     print(f"SUBJECT: {subject}", flush=True)
@@ -87,22 +90,36 @@ def send_bot_email(to_email: str, subject: str, body: str):
             msg['To'] = to_email
             msg.set_content(body)
 
-            if SMTP_PORT == 465:
-                with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-                    s.login(SMTP_USER, SMTP_PASS)
-                    s.send_message(msg)
-            else:
-                with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-                    s.ehlo()
-                    s.starttls()
-                    s.ehlo()
-                    s.login(SMTP_USER, SMTP_PASS)
-                    s.send_message(msg)
-            record['sent_via_smtp'] = True
-            print(f"[BOT EMAIL] Successfully delivered via live SMTP to {to_email}", flush=True)
-        except Exception as e:
-            record['error'] = str(e)
-            print(f"[BOT EMAIL WARNING] Could not deliver via SMTP: {e}", flush=True)
+            ports_to_try = [SMTP_PORT]
+            alt_port = 587 if SMTP_PORT == 465 else 465
+            if alt_port not in ports_to_try:
+                ports_to_try.append(alt_port)
+
+            last_err = None
+            for p in ports_to_try:
+                try:
+                    if p == 465:
+                        with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=12) as s:
+                            s.login(SMTP_USER, SMTP_PASS)
+                            s.send_message(msg)
+                    else:
+                        with smtplib.SMTP(SMTP_HOST, 587, timeout=12) as s:
+                            s.ehlo()
+                            s.starttls()
+                            s.ehlo()
+                            s.login(SMTP_USER, SMTP_PASS)
+                            s.send_message(msg)
+                    record['sent_via_smtp'] = True
+                    print(f"[BOT EMAIL] Successfully delivered via live SMTP (port {p}) to {to_email}", flush=True)
+                    break
+                except Exception as e:
+                    last_err = e
+                    print(f"[BOT EMAIL WARNING] Delivery attempt on port {p} failed: {e}", flush=True)
+
+            if not record['sent_via_smtp']:
+                record['error'] = str(last_err)
+        except Exception as outer_err:
+            record['error'] = str(outer_err)
     else:
         print(f"[BOT EMAIL] SMTP not configured. Logged notification to email_notifications.log", flush=True)
 
@@ -859,6 +876,20 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute('DELETE FROM analytics_events')
                 conn.commit()
             return self.send_json(200, {'reset': True})
+        if parsed.path == '/api/admin/test-email' and self.command == 'POST':
+            try:
+                body = json.loads(self.read_body())
+                target_email = str(body.get('email', '')).strip() or SMTP_USER
+                subject = "Field Notes Studio — Live Email Test"
+                msg_body = f"Hello,\n\nThis is a live test from your Field Notes Studio server!\nSent at: {time.strftime('%Y-%m-%d %H:%M:%S')}\nHost: {self.headers.get('Host', 'localhost')}\n\nYour automated email notifications are working perfectly!"
+                send_bot_email(target_email, subject, msg_body)
+                last = SENT_EMAILS[-1] if SENT_EMAILS else {}
+                if last.get('sent_via_smtp'):
+                    return self.send_json(200, {'success': True, 'message': f'Test email sent successfully to {target_email}'})
+                else:
+                    return self.send_json(500, {'success': False, 'error': last.get('error') or 'Could not deliver email.'})
+            except Exception as e:
+                return self.send_json(400, {'success': False, 'error': str(e)})
         return self.send_json(404, {'error': 'Not found.'})
 
     def do_DELETE(self):
