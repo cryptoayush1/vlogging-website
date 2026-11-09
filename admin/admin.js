@@ -71,6 +71,31 @@ function setupAdminAnalytics(){
     if(refreshBtn){
       refreshBtn.addEventListener('click',()=>loadAnalytics(false));
     }
+
+    const periodSwitcher = document.querySelector('#periodSwitcher');
+    if(periodSwitcher){
+      periodSwitcher.querySelectorAll('.period-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          periodSwitcher.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedPeriod = btn.dataset.period || 'all_time';
+          updateActivePeriodKPIs();
+        });
+      });
+    }
+
+    const scaleSwitcher = document.querySelector('#trendScaleSwitcher');
+    if(scaleSwitcher){
+      scaleSwitcher.querySelectorAll('.period-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          scaleSwitcher.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedTrendScale = btn.dataset.scale || 'daily';
+          renderTrendChart();
+        });
+      });
+    }
+
     const resetBtn = document.querySelector('#resetAnalyticsBtn');
     if(resetBtn){
       resetBtn.addEventListener('click', async () => {
@@ -96,6 +121,113 @@ function setupAdminAnalytics(){
   }
 }
 
+let currentAnalyticsData = null;
+let selectedPeriod = 'all_time';
+let selectedTrendScale = 'daily';
+
+function updateActivePeriodKPIs(){
+  if(!currentAnalyticsData) return;
+  const reps = currentAnalyticsData.reports || {};
+  let target = reps.all_time || {};
+  let label = 'All-Time';
+
+  if(selectedPeriod === 'weekly'){
+    target = reps.weekly || {};
+    label = 'Weekly (Last 7 Days)';
+  } else if(selectedPeriod === 'monthly'){
+    target = reps.monthly || {};
+    label = 'Monthly (Last 30 Days)';
+  } else if(selectedPeriod === 'yearly'){
+    target = reps.yearly || {};
+    label = 'Yearly (Last 365 Days)';
+  }
+
+  const vEl = document.querySelector('#metricViews');
+  const cEl = document.querySelector('#metricClicks');
+  const visEl = document.querySelector('#metricVisitors');
+  const fEl = document.querySelector('#metricFeedback');
+  const badge = document.querySelector('#activePeriodBadge');
+
+  if(vEl) vEl.textContent = Number(target.views || 0).toLocaleString();
+  if(cEl) cEl.textContent = Number(target.clicks || 0).toLocaleString();
+  if(visEl) visEl.textContent = Number(target.visitors || 0).toLocaleString();
+  if(fEl) fEl.textContent = Number(target.feedback || 0).toLocaleString();
+  if(badge) badge.textContent = `Viewing: ${label}`;
+}
+
+function renderTrendChart(){
+  const container = document.querySelector('#trendChartContainer');
+  const sub = document.querySelector('#trendSubtitle');
+  if(!container || !currentAnalyticsData) return;
+  const reps = currentAnalyticsData.reports || {};
+
+  if(selectedTrendScale === 'daily'){
+    if(sub) sub.textContent = 'Daily traffic distribution over the last 7 days';
+    const items = reps.daily_trend || [];
+    if(!items.length){
+      container.innerHTML = '<p class="muted" style="font-size:12px;padding:12px 0">No daily traffic recorded in the past 7 days yet.</p>';
+      return;
+    }
+    const maxVal = Math.max(...items.map(d => d.views || 0), ...items.map(d => d.clicks || 0), 1);
+    container.innerHTML = `
+      <div class="trend-bars-list" style="display:flex;flex-direction:column;gap:12px;">
+        ${items.map(d => {
+          const vPct = Math.min(100, Math.round(((d.views || 0) / maxVal) * 100));
+          const cPct = Math.min(100, Math.round(((d.clicks || 0) / maxVal) * 100));
+          return `
+            <div style="display:grid;grid-template-columns:90px 1fr 140px;align-items:center;gap:14px;font-size:12px;">
+              <strong style="color:var(--ink)">${esc(d.day)}</strong>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="background:#e0e2db;height:7px;border-radius:4px;overflow:hidden;" title="${d.views || 0} views">
+                  <div style="background:var(--ink);height:100%;width:${Math.max(vPct, 2)}%;border-radius:4px;"></div>
+                </div>
+                <div style="background:#e0e2db;height:7px;border-radius:4px;overflow:hidden;" title="${d.clicks || 0} clicks">
+                  <div style="background:#747c31;height:100%;width:${Math.max(cPct, 2)}%;border-radius:4px;"></div>
+                </div>
+              </div>
+              <span style="font-size:11px;color:var(--muted);text-align:right">
+                <b>${d.views || 0}</b> views · <span style="color:#747c31"><b>${d.clicks || 0}</b> reads</span>
+              </span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } else {
+    if(sub) sub.textContent = 'Month-by-month traffic distribution over the last 12 months';
+    const items = reps.monthly_trend || [];
+    if(!items.length){
+      container.innerHTML = '<p class="muted" style="font-size:12px;padding:12px 0">No monthly traffic recorded in the past 12 months yet.</p>';
+      return;
+    }
+    const maxVal = Math.max(...items.map(d => d.views || 0), ...items.map(d => d.clicks || 0), 1);
+    container.innerHTML = `
+      <div class="trend-bars-list" style="display:flex;flex-direction:column;gap:12px;">
+        ${items.map(m => {
+          const vPct = Math.min(100, Math.round(((m.views || 0) / maxVal) * 100));
+          const cPct = Math.min(100, Math.round(((m.clicks || 0) / maxVal) * 100));
+          return `
+            <div style="display:grid;grid-template-columns:90px 1fr 140px;align-items:center;gap:14px;font-size:12px;">
+              <strong style="color:var(--ink)">${esc(m.month)}</strong>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="background:#e0e2db;height:7px;border-radius:4px;overflow:hidden;" title="${m.views || 0} views">
+                  <div style="background:var(--ink);height:100%;width:${Math.max(vPct, 2)}%;border-radius:4px;"></div>
+                </div>
+                <div style="background:#e0e2db;height:7px;border-radius:4px;overflow:hidden;" title="${m.clicks || 0} clicks">
+                  <div style="background:#747c31;height:100%;width:${Math.max(cPct, 2)}%;border-radius:4px;"></div>
+                </div>
+              </div>
+              <span style="font-size:11px;color:var(--muted);text-align:right">
+                <b>${m.views || 0}</b> views · <span style="color:#747c31"><b>${m.clicks || 0}</b> reads</span>
+              </span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+}
+
 async function loadAnalytics(isBackgroundPoll=false){
   const chartsEl=document.querySelector('#vlogChartsContainer');
   const tableEl=document.querySelector('#feedbackTableContainer');
@@ -118,10 +250,31 @@ async function loadAnalytics(isBackgroundPoll=false){
     }
     lastAnalyticsRaw=dataString;
     
-    document.querySelector('#metricViews').textContent=Number(data.total_views||0).toLocaleString();
-    document.querySelector('#metricClicks').textContent=Number(data.total_clicks||0).toLocaleString();
-    document.querySelector('#metricVisitors').textContent=Number(data.unique_visitors||0).toLocaleString();
-    document.querySelector('#metricFeedback').textContent=Number(data.total_feedback||0).toLocaleString();
+    currentAnalyticsData=data;
+    const reps=data.reports||{};
+    const wk=reps.weekly||{};
+    const mo=reps.monthly||{};
+    const yr=reps.yearly||{};
+    const all=reps.all_time||{};
+
+    const setCard=(prefix,obj)=>{
+      const vEl=document.querySelector(`#${prefix}Views`);
+      const cEl=document.querySelector(`#${prefix}Clicks`);
+      const visEl=document.querySelector(`#${prefix}Visitors`);
+      const fEl=document.querySelector(`#${prefix}Feedback`);
+      if(vEl) vEl.textContent=Number(obj.views||0).toLocaleString();
+      if(cEl) cEl.textContent=Number(obj.clicks||0).toLocaleString();
+      if(visEl) visEl.textContent=Number(obj.visitors||0).toLocaleString();
+      if(fEl) fEl.textContent=Number(obj.feedback||0).toLocaleString();
+    };
+
+    setCard('repWeekly',wk);
+    setCard('repMonthly',mo);
+    setCard('repYearly',yr);
+    setCard('repAll',all);
+
+    updateActivePeriodKPIs();
+    renderTrendChart();
     if(countBadge){
       const fbTotal=data.total_feedback||0;
       countBadge.textContent=`${fbTotal} ${fbTotal===1?'Reflection':'Reflections'}`;

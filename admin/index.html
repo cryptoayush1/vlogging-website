@@ -116,17 +116,97 @@
             <p class="kicker">Admin Intelligence</p>
             <h1>Audience,<br><em>reach & feedback.</em></h1>
           </div>
-          <div class="analytics-actions" style="display:flex;gap:10px;align-items:center">
-            <button type="button" class="secondary-button" id="refreshAnalyticsBtn" style="width:auto;margin:0;padding:10px 18px">↻ Refresh data</button>
+          <div class="analytics-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <div class="period-switcher" id="periodSwitcher">
+              <button type="button" class="period-btn active" data-period="all_time">All-Time</button>
+              <button type="button" class="period-btn" data-period="weekly">Weekly (7d)</button>
+              <button type="button" class="period-btn" data-period="monthly">Monthly (30d)</button>
+              <button type="button" class="period-btn" data-period="yearly">Yearly (365d)</button>
+            </div>
+            <button type="button" class="secondary-button" id="refreshAnalyticsBtn" style="width:auto;margin:0;padding:8px 16px;font-size:12px">↻ Refresh data</button>
           </div>
         </div>
 
         <div class="stats analytics-kpis">
-          <div><b id="metricViews">0</b><span>Total Website Views</span></div>
-          <div><b id="metricClicks">0</b><span>Total Vlog Reads / Clicks</span></div>
+          <div><b id="metricViews">0</b><span>Website Views</span></div>
+          <div><b id="metricClicks">0</b><span>Vlog Reads / Clicks</span></div>
           <div><b id="metricVisitors">0</b><span>Unique Visitors Tracked</span></div>
           <div><b id="metricFeedback">0</b><span>Reader Reflections</span></div>
         </div>
+
+        <section class="panel analytics-panel" style="margin-bottom:28px">
+          <div class="panel-title">
+            <div>
+              <p class="kicker">Comparative View Reports</p>
+              <h2>Weekly, Monthly & Yearly Traffic Analysis</h2>
+            </div>
+            <span class="status-dot" id="activePeriodBadge">Viewing: All-Time</span>
+          </div>
+          <p class="muted" style="margin-top:-10px;margin-bottom:24px">Side-by-side performance comparison across weekly, monthly, and yearly intervals.</p>
+          
+          <div class="period-grid">
+            <div class="period-card" id="cardWeekly">
+              <span class="period-label">📅 Weekly Report (7d)</span>
+              <span class="period-big" id="repWeeklyViews">0</span>
+              <span style="font-size:11px;color:var(--muted)">Website Page Views</span>
+              <div class="period-breakdown">
+                <span><span>Article Reads</span> <strong id="repWeeklyClicks">0</strong></span>
+                <span><span>Unique Visitors</span> <strong id="repWeeklyVisitors">0</strong></span>
+                <span><span>Reflections</span> <strong id="repWeeklyFeedback">0</strong></span>
+              </div>
+            </div>
+
+            <div class="period-card" id="cardMonthly">
+              <span class="period-label">🗓️ Monthly Report (30d)</span>
+              <span class="period-big" id="repMonthlyViews">0</span>
+              <span style="font-size:11px;color:var(--muted)">Website Page Views</span>
+              <div class="period-breakdown">
+                <span><span>Article Reads</span> <strong id="repMonthlyClicks">0</strong></span>
+                <span><span>Unique Visitors</span> <strong id="repMonthlyVisitors">0</strong></span>
+                <span><span>Reflections</span> <strong id="repMonthlyFeedback">0</strong></span>
+              </div>
+            </div>
+
+            <div class="period-card" id="cardYearly">
+              <span class="period-label">📈 Yearly Report (365d)</span>
+              <span class="period-big" id="repYearlyViews">0</span>
+              <span style="font-size:11px;color:var(--muted)">Website Page Views</span>
+              <div class="period-breakdown">
+                <span><span>Article Reads</span> <strong id="repYearlyClicks">0</strong></span>
+                <span><span>Unique Visitors</span> <strong id="repYearlyVisitors">0</strong></span>
+                <span><span>Reflections</span> <strong id="repYearlyFeedback">0</strong></span>
+              </div>
+            </div>
+
+            <div class="period-card" id="cardAllTime">
+              <span class="period-label">🌐 All-Time Total</span>
+              <span class="period-big" id="repAllViews">0</span>
+              <span style="font-size:11px;color:var(--muted)">Website Page Views</span>
+              <div class="period-breakdown">
+                <span><span>Article Reads</span> <strong id="repAllClicks">0</strong></span>
+                <span><span>Unique Visitors</span> <strong id="repAllVisitors">0</strong></span>
+                <span><span>Reflections</span> <strong id="repAllFeedback">0</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timeline Trend Graph -->
+          <div class="trend-box" style="background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+              <div>
+                <strong style="display:block;font-size:14px;color:var(--ink);">Timeline View Breakdown</strong>
+                <small style="color:var(--muted);font-size:11px;" id="trendSubtitle">Daily traffic distribution over the last 7 days</small>
+              </div>
+              <div class="period-switcher" id="trendScaleSwitcher">
+                <button type="button" class="period-btn active" data-scale="daily">7-Day Daily</button>
+                <button type="button" class="period-btn" data-scale="monthly">12-Month History</button>
+              </div>
+            </div>
+            <div id="trendChartContainer">
+              <p class="muted" style="font-size:12px">Loading timeline trend…</p>
+            </div>
+          </div>
+        </section>
 
         <section class="panel analytics-panel">
           <div class="panel-title">

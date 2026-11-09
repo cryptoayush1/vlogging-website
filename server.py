@@ -872,6 +872,49 @@ class Handler(BaseHTTPRequestHandler):
                 total_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click'").fetchone()[0]
                 unique_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != ''").fetchone()[0]
                 total_feedback = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+
+                # Weekly metrics (Last 7 Days)
+                weekly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                weekly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                weekly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                weekly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-7 days')").fetchone()[0]
+
+                # Monthly metrics (Last 30 Days)
+                monthly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                monthly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                monthly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                monthly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-30 days')").fetchone()[0]
+
+                # Yearly metrics (Last 365 Days)
+                yearly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                yearly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                yearly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                yearly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-365 days')").fetchone()[0]
+
+                # Daily view breakdown for last 7 days
+                daily_trend = [dict(r) for r in conn.execute("""
+                    SELECT date(created_at) as day,
+                           SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
+                           SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
+                           COUNT(DISTINCT ip_hash) as visitors
+                    FROM analytics_events
+                    WHERE created_at >= datetime('now', '-7 days')
+                    GROUP BY date(created_at)
+                    ORDER BY day ASC
+                """).fetchall()]
+
+                # Monthly view breakdown for last 12 months
+                monthly_trend = [dict(r) for r in conn.execute("""
+                    SELECT strftime('%Y-%m', created_at) as month,
+                           SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
+                           SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
+                           COUNT(DISTINCT ip_hash) as visitors
+                    FROM analytics_events
+                    WHERE created_at >= datetime('now', '-365 days')
+                    GROUP BY strftime('%Y-%m', created_at)
+                    ORDER BY month ASC
+                """).fetchall()]
+
                 vlog_rows = conn.execute("SELECT id, title, category, author, word_count, created_at FROM vlogs ORDER BY created_at DESC").fetchall()
                 vlogs_data = []
                 for v in vlog_rows:
@@ -897,6 +940,34 @@ class Handler(BaseHTTPRequestHandler):
                     'total_clicks': total_clicks,
                     'unique_visitors': unique_visitors,
                     'total_feedback': total_feedback,
+                    'reports': {
+                        'weekly': {
+                            'views': weekly_views,
+                            'clicks': weekly_clicks,
+                            'visitors': weekly_visitors,
+                            'feedback': weekly_feedback
+                        },
+                        'monthly': {
+                            'views': monthly_views,
+                            'clicks': monthly_clicks,
+                            'visitors': monthly_visitors,
+                            'feedback': monthly_feedback
+                        },
+                        'yearly': {
+                            'views': yearly_views,
+                            'clicks': yearly_clicks,
+                            'visitors': yearly_visitors,
+                            'feedback': yearly_feedback
+                        },
+                        'all_time': {
+                            'views': total_views,
+                            'clicks': total_clicks,
+                            'visitors': unique_visitors,
+                            'feedback': total_feedback
+                        },
+                        'daily_trend': daily_trend,
+                        'monthly_trend': monthly_trend
+                    },
                     'vlogs': vlogs_data,
                     'feedback': feedback_data
                 })

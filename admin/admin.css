@@ -17,6 +17,20 @@ input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 
 
 /* Graphical Analytics */
 .analytics-panel{margin-bottom:28px}
+.period-switcher{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:3px;gap:3px}
+.period-btn{background:transparent;border:0;padding:6px 12px;font-size:11px;font-weight:600;color:var(--muted);border-radius:3px;cursor:pointer;transition:all .15s}
+.period-btn:hover{color:var(--ink)}
+.period-btn.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.period-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:900px){.period-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:550px){.period-grid{grid-template-columns:1fr}}
+.period-card{background:#fff;border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:6px;transition:box-shadow .2s ease,border-color .2s ease}
+.period-card:hover{border-color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.04)}
+.period-card .period-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.period-card .period-big{font:400 32px Georgia,serif;color:var(--ink);line-height:1.1;margin-top:2px}
+.period-card .period-breakdown{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}
+.period-card .period-breakdown span{display:flex;justify-content:space-between}
+.period-card .period-breakdown strong{color:var(--ink)}
 .vlog-charts-list{display:flex;flex-direction:column;gap:18px}
 .vlog-chart-item{background:var(--paper);border:1px solid var(--line);padding:20px 24px;border-radius:4px}
 .chart-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;gap:8px}

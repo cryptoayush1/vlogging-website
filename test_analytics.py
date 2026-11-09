@@ -159,5 +159,43 @@ class AnalyticsFeatureTests(unittest.TestCase):
         self.conn.commit()
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM analytics_events").fetchone()[0], 0)
 
+    def test_weekly_monthly_yearly_analytics_queries(self):
+        # Insert events with different timestamps: recent (now), 10 days ago, 45 days ago, 400 days ago
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash, created_at) VALUES('page_view', 'ip_now', datetime('now'))")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash, created_at) VALUES('vlog_click', 'ip_now', datetime('now'))")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash, created_at) VALUES('page_view', 'ip_10d', datetime('now', '-10 days'))")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash, created_at) VALUES('page_view', 'ip_45d', datetime('now', '-45 days'))")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash, created_at) VALUES('page_view', 'ip_400d', datetime('now', '-400 days'))")
+        self.conn.commit()
+
+        # Weekly (<= 7 days): only 1 page_view
+        w_views = self.conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type='page_view' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+        self.assertEqual(w_views, 1)
+
+        # Monthly (<= 30 days): recent (now) + 10 days ago = 2 page_views
+        m_views = self.conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type='page_view' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+        self.assertEqual(m_views, 2)
+
+        # Yearly (<= 365 days): recent + 10d + 45d = 3 page_views
+        y_views = self.conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type='page_view' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+        self.assertEqual(y_views, 3)
+
+        # All-time total: 4 page_views
+        all_views = self.conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type='page_view'").fetchone()[0]
+        self.assertEqual(all_views, 4)
+
+    def test_admin_ui_has_periodic_view_reports(self):
+        html = (Path(__file__).parent / 'admin' / 'index.html').read_text(encoding='utf-8')
+        self.assertIn('id="periodSwitcher"', html)
+        self.assertIn('id="repWeeklyViews"', html)
+        self.assertIn('id="repMonthlyViews"', html)
+        self.assertIn('id="repYearlyViews"', html)
+        self.assertIn('id="repAllViews"', html)
+        self.assertIn('id="trendChartContainer"', html)
+
+        js = (Path(__file__).parent / 'admin' / 'admin.js').read_text(encoding='utf-8')
+        self.assertIn('updateActivePeriodKPIs', js)
+        self.assertIn('renderTrendChart', js)
+
 if __name__ == '__main__':
     unittest.main()
