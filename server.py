@@ -921,6 +921,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(500, {'success': False, 'error': last.get('error') or 'Could not deliver email.'})
             except Exception as e:
                 return self.send_json(400, {'success': False, 'error': str(e)})
+        if parsed.path == '/api/admin/credentials/reset' and self.command == 'POST':
+            with db() as conn:
+                conn.execute('DELETE FROM users')
+                conn.commit()
+            with LOCK:
+                SESSIONS.clear()
+            return self.send_json(200, {'deleted': True, 'message': 'All user credentials wiped from database.'})
         return self.send_json(404, {'error': 'Not found.'})
 
     def do_DELETE(self):
