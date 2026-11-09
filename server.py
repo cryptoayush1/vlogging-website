@@ -60,8 +60,11 @@ def load_dotenv():
 
 load_dotenv()
 
-TURSO_DATABASE_URL = os.getenv('TURSO_DATABASE_URL', '').strip()
-TURSO_AUTH_TOKEN = os.getenv('TURSO_AUTH_TOKEN', '').strip()
+DEFAULT_TURSO_URL = 'libsql://blogging-website-ayush2509.aws-ap-south-1.turso.io'
+DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTQyNTIyNzIsImlkIjoiMDFhMWMxYzMtNWIwMS03YjViLTk0NTAtZTMxYTk2OThmYjIwIiwia2lkIjoic2ZoX25TblNDOFZsX1ZLZldDMmtaOWRLc3dtNHZ0SjVCUmtFTk9LNkhlcyIsInJpZCI6IjQxY2QyM2I1LWUxOWYtNDE0My1iMjE1LTRmNWFhNWIwZjg3YiJ9.X96ZeYuMIWIe61PVWgG7iDSeQrLD4Ahk3Z0MN6OSFZES2YVEN-cefHL4sxGnjprWcfcHmc_g91JDnnWQtuzqCw'
+
+TURSO_DATABASE_URL = (os.getenv('TURSO_DATABASE_URL') or DEFAULT_TURSO_URL).strip()
+TURSO_AUTH_TOKEN = (os.getenv('TURSO_AUTH_TOKEN') or DEFAULT_TURSO_TOKEN).strip()
 
 SMTP_USER = os.getenv('SMTP_USER', 'vlogingwebsite@gmail.com')
 SMTP_PASS = os.getenv('SMTP_PASS', 'uxendqgrtentfkzh').replace(' ', '')

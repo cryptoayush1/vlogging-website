@@ -587,11 +587,18 @@ async function loadUsers(){
 async function checkSetupStatus(){
   try{
     const res=await api('/api/admin/setup-status');
+    const isTurso = res && res.database === 'turso';
     const statusDot=document.querySelector('#studioStatusDot');
-    if(statusDot && res && res.database==='turso'){
-      statusDot.textContent='● Studio online · Turso Cloud DB';
-      statusDot.title='Connected to Turso Cloud SQLite. Data persists permanently across restarts.';
+    if(statusDot){
+      statusDot.textContent=isTurso ? '● Studio online · Turso Cloud DB' : '● Studio online';
+      statusDot.title=isTurso ? 'Connected to Turso Cloud SQLite. Data persists permanently across restarts.' : 'Local SQLite';
     }
+    const loginBadge=document.querySelector('#loginDbBadge');
+    const registerBadge=document.querySelector('#registerDbBadge');
+    const badgeText = isTurso ? '● Connected to Turso Cloud DB (Persistent)' : '● Connecting database…';
+    const badgeColor = isTurso ? '#5c751f' : 'var(--muted)';
+    if(loginBadge){ loginBadge.textContent=badgeText; loginBadge.style.color=badgeColor; }
+    if(registerBadge){ registerBadge.textContent=badgeText; registerBadge.style.color=badgeColor; }
     const roleSelect=document.querySelector('#roleSelect');
     const optAdmin=document.querySelector('#optAdmin');
     const optCoadmin=document.querySelector('#optCoadmin');
