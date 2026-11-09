@@ -24,6 +24,7 @@ from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+import urllib.request
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / 'field_notes.db'
 UPLOAD_DIR = ROOT / 'uploads'
@@ -117,7 +118,37 @@ def send_bot_email(to_email: str, subject: str, body: str):
                     print(f"[BOT EMAIL WARNING] Delivery attempt on port {p} failed: {e}", flush=True)
 
             if not record['sent_via_smtp']:
-                record['error'] = str(last_err)
+                # On hosts like Render Free Tier where direct outbound SMTP (ports 465/587) is blocked,
+                # relay securely over HTTPS (port 443) via our Vercel email-relay endpoint!
+                relay_url = os.getenv('EMAIL_RELAY_URL', 'https://cryptoayush1-vlogging-website.vercel.app/api/email-relay')
+                try:
+                    print(f"[BOT EMAIL] Attempting HTTPS relay via {relay_url}...", flush=True)
+                    req_data = json.dumps({
+                        'to': to_email,
+                        'subject': subject,
+                        'body': body,
+                        'secret': 'field_notes_secure_relay_2026'
+                    }).encode('utf-8')
+                    req = urllib.request.Request(
+                        relay_url,
+                        data=req_data,
+                        headers={
+                            'Content-Type': 'application/json',
+                            'X-Relay-Secret': 'field_notes_secure_relay_2026'
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=15) as rresp:
+                        rbody = json.loads(rresp.read().decode('utf-8'))
+                        if rbody.get('success'):
+                            record['sent_via_smtp'] = True
+                            record['sent_via_relay'] = True
+                            record['error'] = None
+                            print(f"[BOT EMAIL] Successfully delivered via HTTPS email relay to {to_email}", flush=True)
+                        else:
+                            record['error'] = rbody.get('error') or str(last_err)
+                except Exception as relay_err:
+                    print(f"[BOT EMAIL WARNING] HTTPS relay attempt failed: {relay_err}", flush=True)
+                    record['error'] = f"SMTP error: {last_err}; Relay error: {relay_err}"
         except Exception as outer_err:
             record['error'] = str(outer_err)
     else:
