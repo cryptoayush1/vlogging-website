@@ -580,13 +580,14 @@ class TursoConnection:
         self.url = u
         self.token = token.strip()
         self._parsed = urlparse(self.url)
-        self._http_conn = None
-        self._lock = threading.Lock()
+        self._local = threading.local()
 
     def _get_http(self):
-        if self._http_conn is None:
-            self._http_conn = http.client.HTTPSConnection(self._parsed.netloc, timeout=10)
-        return self._http_conn
+        conn = getattr(self._local, 'conn', None)
+        if conn is None:
+            conn = http.client.HTTPSConnection(self._parsed.netloc, timeout=10)
+            self._local.conn = conn
+        return conn
 
     def execute(self, sql, params=()):
         if params is None:
@@ -608,20 +609,19 @@ class TursoConnection:
         }
 
         raw = None
-        with self._lock:
-            for attempt in range(2):
-                try:
-                    conn = self._get_http()
-                    conn.request('POST', self._parsed.path, body_bytes, headers)
-                    resp = conn.getresponse()
-                    raw = resp.read()
-                    break
-                except Exception:
-                    self._http_conn = None
-                    if attempt == 1:
-                        req = urllib.request.Request(self.url, data=body_bytes, headers=headers)
-                        with urllib.request.urlopen(req, timeout=10) as fallback_resp:
-                            raw = fallback_resp.read()
+        for attempt in range(2):
+            try:
+                conn = self._get_http()
+                conn.request('POST', self._parsed.path, body_bytes, headers)
+                resp = conn.getresponse()
+                raw = resp.read()
+                break
+            except Exception:
+                self._local.conn = None
+                if attempt == 1:
+                    req = urllib.request.Request(self.url, data=body_bytes, headers=headers)
+                    with urllib.request.urlopen(req, timeout=10) as fallback_resp:
+                        raw = fallback_resp.read()
 
         try:
             body = json.loads(raw.decode('utf-8'))
@@ -650,6 +650,51 @@ class TursoConnection:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
+
+
+VLOGS_CACHE = None
+VLOGS_CACHE_LOCK = threading.Lock()
+
+
+def get_cached_vlogs(conn=None):
+    global VLOGS_CACHE
+    with VLOGS_CACHE_LOCK:
+        if VLOGS_CACHE is not None:
+            return VLOGS_CACHE
+
+    should_close = False
+    if conn is None:
+        conn = db()
+        should_close = True
+    try:
+        rows = [dict(row) for row in conn.execute(
+            '''SELECT id, title, category, author, excerpt, filename, word_count, created_at,
+                      user_id, body_text, thumbnail_filename, author_image_filename, author_bio
+               FROM vlogs ORDER BY created_at DESC'''
+        )]
+        with VLOGS_CACHE_LOCK:
+            VLOGS_CACHE = rows
+        return rows
+    finally:
+        if should_close:
+            conn.close()
+
+
+def invalidate_vlogs_cache():
+    global VLOGS_CACHE
+    with VLOGS_CACHE_LOCK:
+        VLOGS_CACHE = None
+
+
+def keepalive_worker():
+    while True:
+        time.sleep(180)
+        try:
+            conn = get_turso_conn()
+            if conn:
+                conn.execute("SELECT 1")
+        except Exception:
+            pass
 
 
 DB_INITIALIZED = False
@@ -787,8 +832,8 @@ class Handler(BaseHTTPRequestHandler):
                 db_type = 'turso' if isinstance(conn, TursoConnection) else 'local_sqlite'
             return self.send_json(200, {'has_admin': has_admin, 'database': db_type})
         if parsed.path == '/api/vlogs':
-            with db() as conn: rows = [dict(row) for row in conn.execute('SELECT * FROM vlogs ORDER BY created_at DESC')]
-            return self.send_json(200, rows)
+            rows = get_cached_vlogs()
+            return self.send_json(200, rows, {'Cache-Control': 'public, max-age=1, stale-while-revalidate=2'})
         if parsed.path == '/api/feedback':
             qs = parse_qs(parsed.query)
             vlog_id = qs.get('vlog_id', [''])[0].strip()
@@ -892,6 +937,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'public, max-age=86400, immutable')
             self.end_headers()
             self.wfile.write(data)
             return
@@ -1154,6 +1200,7 @@ class Handler(BaseHTTPRequestHandler):
                         (title, category, author, excerpt, safe_name, final_word_count, user['id'], final_body, safe_thumb_name, safe_author_img_name, author_bio, safe_thumb_b64, safe_author_b64)
                     )
                     vlog_id = cursor.lastrowid
+                invalidate_vlogs_cache()
                 return self.send_json(201, {
                     'id': vlog_id,
                     'title': title,
@@ -1284,6 +1331,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     conn.commit()
 
+                invalidate_vlogs_cache()
                 return self.send_json(200, {
                     'id': vlog_id,
                     'title': title,
@@ -1318,6 +1366,7 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute('DELETE FROM feedback WHERE (vlog_id IS NOT NULL AND vlog_id=?) OR LOWER(vlog_title)=LOWER(?)', (vlog_id, title))
                 conn.execute('DELETE FROM vlogs WHERE id=?', (vlog_id,))
                 conn.commit()
+            invalidate_vlogs_cache()
             # Delete uploaded files
             file_path = UPLOAD_DIR / filename
             if file_path.is_file():
@@ -1387,6 +1436,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     port = int(os.getenv('PORT', '8000')); db().close(); print(f'Field Notes backend listening on port {port}')
+    threading.Thread(target=keepalive_worker, daemon=True).start()
     ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
 
 if __name__ == '__main__': main()

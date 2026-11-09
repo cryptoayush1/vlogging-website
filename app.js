@@ -84,8 +84,12 @@ function renderVlogs(items = vlogs){
 }
 
 let lastPublishedRaw = '';
+let isFetchingVlogs = false;
 
 async function loadPublishedVlogs(){
+  if (isFetchingVlogs) return;
+  if (document.hidden) return;
+  isFetchingVlogs = true;
   try {
     const response = await fetch('/api/vlogs');
     if (!response.ok) return;
@@ -156,8 +160,16 @@ async function loadPublishedVlogs(){
     }
   } catch (error) {
     // Keep existing vlogs on transient connection failure
+  } finally {
+    isFetchingVlogs = false;
   }
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    loadPublishedVlogs();
+  }
+});
 
 let lastFeedbackRaw='';
 let feedbackPollTimer=null;

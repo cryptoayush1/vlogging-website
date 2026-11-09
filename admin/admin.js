@@ -712,7 +712,11 @@ uploadForm.addEventListener('submit',async e=>{
 });
 
 let lastArchiveRaw='';
+let isArchiving=false;
+
 async function loadArchive(isPoll=false){
+  if(isPoll && (isArchiving || document.hidden)) return;
+  isArchiving=true;
   try{
     const items=await api('/api/vlogs?t='+Date.now());
     currentArchiveItems=items||[];
@@ -760,7 +764,14 @@ async function loadArchive(isPoll=false){
       try{await api(`/api/admin/vlogs/${delId}`,{method:'DELETE'});loadArchive(false);}catch(err){alert(err.message);}
     }));
   }catch(error){console.error(error);}
+  finally{isArchiving=false;}
 }
+
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && currentUser){
+    loadArchive(true);
+  }
+});
 
 // Auto-sync studio archive every 1 second
 setInterval(()=>{
