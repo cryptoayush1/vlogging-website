@@ -579,6 +579,14 @@ class TursoConnection:
             u = u.rstrip('/') + '/v2/pipeline'
         self.url = u
         self.token = token.strip()
+        self._parsed = urlparse(self.url)
+        self._http_conn = None
+        self._lock = threading.Lock()
+
+    def _get_http(self):
+        if self._http_conn is None:
+            self._http_conn = http.client.HTTPSConnection(self._parsed.netloc, timeout=10)
+        return self._http_conn
 
     def execute(self, sql, params=()):
         if params is None:
@@ -592,14 +600,31 @@ class TursoConnection:
                 {'type': 'close'}
             ]
         }
-        req = urllib.request.Request(
-            self.url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}
-        )
+        body_bytes = json.dumps(payload).encode('utf-8')
+        headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive'
+        }
+
+        raw = None
+        with self._lock:
+            for attempt in range(2):
+                try:
+                    conn = self._get_http()
+                    conn.request('POST', self._parsed.path, body_bytes, headers)
+                    resp = conn.getresponse()
+                    raw = resp.read()
+                    break
+                except Exception:
+                    self._http_conn = None
+                    if attempt == 1:
+                        req = urllib.request.Request(self.url, data=body_bytes, headers=headers)
+                        with urllib.request.urlopen(req, timeout=10) as fallback_resp:
+                            raw = fallback_resp.read()
+
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = json.loads(resp.read().decode('utf-8'))
+            body = json.loads(raw.decode('utf-8'))
         except Exception as e:
             raise sqlite3.OperationalError(f'Turso query error: {e}')
 
@@ -627,46 +652,67 @@ class TursoConnection:
         pass
 
 
-def db():
-    conn = None
-    if TURSO_DATABASE_URL and TURSO_AUTH_TOKEN:
-        try:
-            candidate = TursoConnection(TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
-            candidate.execute('SELECT 1')
-            conn = candidate
-        except Exception as e:
-            conn = None
+DB_INITIALIZED = False
+_GLOBAL_TURSO_CONN = None
 
+
+def get_turso_conn():
+    global _GLOBAL_TURSO_CONN
+    if _GLOBAL_TURSO_CONN is None and TURSO_DATABASE_URL and TURSO_AUTH_TOKEN:
+        try:
+            cand = TursoConnection(TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
+            cand.execute("SELECT 1")
+            _GLOBAL_TURSO_CONN = cand
+        except Exception:
+            _GLOBAL_TURSO_CONN = None
+    return _GLOBAL_TURSO_CONN
+
+
+def run_migrations_once(conn):
+    global DB_INITIALIZED
+    if DB_INITIALIZED:
+        return
+    with LOCK:
+        if DB_INITIALIZED:
+            return
+        conn.execute('''CREATE TABLE IF NOT EXISTS vlogs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL,
+        author TEXT NOT NULL, excerpt TEXT NOT NULL, filename TEXT NOT NULL,
+        word_count INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, user_id INTEGER,
+        body_text TEXT DEFAULT '', thumbnail_filename TEXT DEFAULT '',
+        author_image_filename TEXT DEFAULT '', author_bio TEXT DEFAULT '',
+        thumbnail_data TEXT DEFAULT '', author_image_data TEXT DEFAULT '')''')
+        # Add columns if missing (migration)
+        cols = [row['name'] for row in conn.execute("PRAGMA table_info(vlogs)")]
+        if 'user_id' not in cols:
+            conn.execute('ALTER TABLE vlogs ADD COLUMN user_id INTEGER REFERENCES users(id)')
+        if 'body_text' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN body_text TEXT DEFAULT ''")
+        if 'thumbnail_filename' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_filename TEXT DEFAULT ''")
+        if 'author_image_filename' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ''")
+        if 'author_bio' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ''")
+        if 'thumbnail_data' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_data TEXT DEFAULT ''")
+        if 'author_image_data' not in cols:
+            conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_data TEXT DEFAULT ''")
+        init_db(conn)
+        ensure_admin(conn)
+        conn.commit()
+        DB_INITIALIZED = True
+
+
+def db():
+    conn = get_turso_conn()
     if conn is None:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
 
-    conn.execute('''CREATE TABLE IF NOT EXISTS vlogs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL,
-    author TEXT NOT NULL, excerpt TEXT NOT NULL, filename TEXT NOT NULL,
-    word_count INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, user_id INTEGER,
-    body_text TEXT DEFAULT '', thumbnail_filename TEXT DEFAULT '',
-    author_image_filename TEXT DEFAULT '', author_bio TEXT DEFAULT '',
-    thumbnail_data TEXT DEFAULT '', author_image_data TEXT DEFAULT '')''')
-    # Add columns if missing (migration)
-    cols = [row['name'] for row in conn.execute("PRAGMA table_info(vlogs)")]
-    if 'user_id' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN user_id INTEGER REFERENCES users(id)')
-    if 'body_text' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN body_text TEXT DEFAULT ''")
-    if 'thumbnail_filename' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_filename TEXT DEFAULT ''")
-    if 'author_image_filename' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ''")
-    if 'author_bio' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ''")
-    if 'thumbnail_data' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_data TEXT DEFAULT ''")
-    if 'author_image_data' not in cols:
-        conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_data TEXT DEFAULT ''")
-    init_db(conn)
-    ensure_admin(conn)
-    conn.commit()
+    if not DB_INITIALIZED:
+        run_migrations_once(conn)
+
     return conn
 
 
