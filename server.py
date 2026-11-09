@@ -1165,6 +1165,140 @@ class Handler(BaseHTTPRequestHandler):
                 })
             except ValueError as error: return self.send_json(400, {'error': str(error)})
             except Exception as error: return self.send_json(500, {'error': 'Upload failed. Please try again.'})
+        if (parsed.path.startswith('/api/admin/vlogs/') and parsed.path.endswith('/update') and self.command == 'POST') or \
+           (parsed.path.startswith('/api/admin/vlogs/') and self.command == 'PUT'):
+            if not self.authenticated(): return self.send_json(401, {'error': 'Admin authentication required.'})
+            try:
+                parts_path = [p for p in parsed.path.split('/') if p]
+                vlog_id = int(parts_path[3])
+            except (IndexError, ValueError):
+                return self.send_json(400, {'error': 'Invalid vlog ID.'})
+            with db() as conn:
+                existing = conn.execute('SELECT * FROM vlogs WHERE id=?', (vlog_id,)).fetchone()
+            if not existing:
+                return self.send_json(404, {'error': 'Vlog not found.'})
+
+            try:
+                body = self.read_body()
+                parts = parse_multipart(body, self.headers.get('Content-Type', ''))
+                file = parts.get('document', {})
+                filename = file.get('filename') or ''
+                title = parts.get('title', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                category = parts.get('category', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                author = parts.get('author', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                excerpt = parts.get('excerpt', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                author_bio = parts.get('author_bio', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                submitted_body = parts.get('body_text', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                data = file.get('data', b'')
+
+                if not all([title, category, author, excerpt]):
+                    raise ValueError('Title, category, author, and excerpt are required.')
+
+                if author_bio:
+                    bio_words = text_word_count(author_bio)
+                    if bio_words > MAX_AUTHOR_BIO_WORDS:
+                        raise ValueError(f'Author bio exceeds the 200-word limit ({bio_words} words).')
+
+                safe_name = existing['filename']
+                if filename and data:
+                    if not is_allowed_document(filename):
+                        raise ValueError('Only .doc and .docx files are supported.')
+                    if len(data) > MAX_DOCUMENT_BYTES:
+                        raise ValueError(f'Word document exceeds the 5 MB limit ({round(len(data) / (1024 * 1024), 2)} MB).')
+                    doc_text = extract_body_text(data, filename)
+                    final_body = submitted_body if submitted_body else doc_text
+                    safe_name = secrets.token_hex(8) + Path(filename).suffix.lower()
+                    UPLOAD_DIR.mkdir(exist_ok=True)
+                    (UPLOAD_DIR / safe_name).write_bytes(data)
+                else:
+                    final_body = submitted_body if submitted_body else (existing['body_text'] or '')
+
+                final_word_count = text_word_count(final_body) if final_body else (existing['word_count'] or 0)
+                if final_word_count > MAX_PREVIEW_WORDS:
+                    raise ValueError(f'Document text exceeds the 6,000-word limit ({final_word_count} words).')
+
+                # Thumbnail update
+                thumb_part = parts.get('thumbnail', {})
+                thumb_filename = thumb_part.get('filename') or ''
+                thumb_data = thumb_part.get('data', b'')
+                remove_thumb = parts.get('remove_thumbnail', {}).get('data', b'').decode('utf-8', 'ignore').strip() == '1'
+
+                if thumb_filename and thumb_data:
+                    if len(thumb_data) > MAX_THUMBNAIL_BYTES:
+                        raise ValueError(f'Thumbnail image exceeds the 250 KB limit ({len(thumb_data) // 1024} KB).')
+                    if not is_allowed_thumbnail(thumb_filename, thumb_data):
+                        raise ValueError('Only JPEG images (.jpg or .jpeg) are supported for vlog thumbnails.')
+                    safe_thumb_name = 'thumb_' + secrets.token_hex(8) + '.jpg'
+                    UPLOAD_DIR.mkdir(exist_ok=True)
+                    (UPLOAD_DIR / safe_thumb_name).write_bytes(thumb_data)
+                    safe_thumb_b64 = base64.b64encode(thumb_data).decode()
+                elif remove_thumb:
+                    safe_thumb_name = ''
+                    safe_thumb_b64 = ''
+                else:
+                    safe_thumb_name = existing['thumbnail_filename'] or ''
+                    safe_thumb_b64 = existing['thumbnail_data'] or ''
+
+                # Author picture update
+                author_img_part = parts.get('author_image', {})
+                author_img_filename = author_img_part.get('filename') or ''
+                author_img_data = author_img_part.get('data', b'')
+                remove_author_img = parts.get('remove_author_image', {}).get('data', b'').decode('utf-8', 'ignore').strip() == '1'
+
+                if author_img_filename and author_img_data:
+                    if len(author_img_data) > MAX_AUTHOR_IMAGE_BYTES:
+                        raise ValueError(f'Author picture exceeds the 200 KB limit ({round(len(author_img_data) / 1024, 1)} KB).')
+                    if not is_allowed_author_image(author_img_filename, author_img_data):
+                        raise ValueError('Only JPEG and PNG images (.jpg, .jpeg, .png) are supported for author pictures.')
+                    ext = Path(author_img_filename).suffix.lower()
+                    if ext == '.jpeg': ext = '.jpg'
+                    safe_author_img_name = 'author_' + secrets.token_hex(8) + ext
+                    UPLOAD_DIR.mkdir(exist_ok=True)
+                    (UPLOAD_DIR / safe_author_img_name).write_bytes(author_img_data)
+                    safe_author_b64 = base64.b64encode(author_img_data).decode()
+                elif remove_author_img:
+                    safe_author_img_name = ''
+                    safe_author_b64 = ''
+                else:
+                    safe_author_img_name = existing['author_image_filename'] or ''
+                    safe_author_b64 = existing['author_image_data'] or ''
+
+                with db() as conn:
+                    conn.execute(
+                        '''UPDATE vlogs SET
+                            title=?,
+                            category=?,
+                            author=?,
+                            excerpt=?,
+                            filename=?,
+                            word_count=?,
+                            body_text=?,
+                            thumbnail_filename=?,
+                            thumbnail_data=?,
+                            author_image_filename=?,
+                            author_image_data=?,
+                            author_bio=?
+                        WHERE id=?''',
+                        (title, category, author, excerpt, safe_name, final_word_count, final_body,
+                         safe_thumb_name, safe_thumb_b64, safe_author_img_name, safe_author_b64, author_bio, vlog_id)
+                    )
+                    conn.commit()
+
+                return self.send_json(200, {
+                    'id': vlog_id,
+                    'title': title,
+                    'category': category,
+                    'author': author,
+                    'excerpt': excerpt,
+                    'word_count': final_word_count,
+                    'body_text': final_body,
+                    'thumbnail_filename': safe_thumb_name,
+                    'author_image_filename': safe_author_img_name,
+                    'author_bio': author_bio,
+                    'updated': True
+                })
+            except ValueError as error: return self.send_json(400, {'error': str(error)})
+            except Exception as error: return self.send_json(500, {'error': 'Update failed. Please try again.'})
         if parsed.path.startswith('/api/admin/vlogs/') and self.command == 'DELETE':
             if not self.authenticated(): return self.send_json(401, {'error': 'Admin authentication required.'})
             try:
@@ -1244,6 +1378,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         # Reuse the same logic as do_POST for DELETE endpoints
+        self.do_POST()
+
+    def do_PUT(self):
+        # Reuse the same logic as do_POST for PUT endpoints
         self.do_POST()
 
 

@@ -36,10 +36,16 @@
         <div class="workspace">
           <section class="panel">
             <div class="panel-title">
-              <div><p class="kicker">New publication</p><h2>Upload a vlog</h2></div>
-              <span class="step">01 / 01</span>
+              <div><p class="kicker" id="formKicker">New publication</p><h2 id="formTitle">Upload a vlog</h2></div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <button type="button" class="secondary-button hidden" id="cancelEditBtn" style="width:auto;margin:0;padding:6px 12px;font-size:12px;border-radius:4px;">Cancel edit ×</button>
+                <span class="step" id="formStep">01 / 01</span>
+              </div>
             </div>
             <form id="uploadForm" enctype="multipart/form-data">
+              <input type="hidden" name="vlog_id" id="editVlogId" value="">
+              <input type="hidden" name="remove_thumbnail" id="removeThumbnailField" value="0">
+              <input type="hidden" name="remove_author_image" id="removeAuthorImageField" value="0">
               <div class="two-col">
                 <label>Title<input name="title" required placeholder="A thoughtful title"></label>
                 <label>Category
@@ -56,8 +62,8 @@
               
               <label class="file-drop" id="docDrop">
                 <input type="file" name="document" accept=".doc,.docx" required>
-                <strong>Choose a Word document</strong>
-                <span>DOC or DOCX · Maximum file size 5 MB</span>
+                <strong id="docDropTitle">Choose a Word document</strong>
+                <span id="docDropSubtitle">DOC or DOCX · Maximum file size 5 MB</span>
               </label>
 
               <div id="docPreviewContainer" class="hidden" style="margin-top:19px;">
@@ -71,8 +77,8 @@
 
               <label class="file-drop image-drop" id="authorImageDrop" style="margin-top:16px">
                 <input type="file" name="author_image" id="authorImageInput" accept="image/jpeg,image/png,.jpg,.jpeg,.png">
-                <strong>Choose an Author Picture</strong>
-                <span>JPEG or PNG · Under 200 KB · Displayed with author bio</span>
+                <strong id="authorImageDropTitle">Choose an Author Picture</strong>
+                <span id="authorImageDropSubtitle">JPEG or PNG · Under 200 KB · Displayed with author bio</span>
               </label>
               <div id="authorImagePreview" class="upload-preview hidden"></div>
 
@@ -86,11 +92,11 @@
 
               <label class="file-drop image-drop" id="thumbnailDrop" style="margin-top:16px">
                 <input type="file" name="thumbnail" id="thumbnailInput" accept="image/jpeg,.jpg,.jpeg">
-                <strong>Choose a Vlog Thumbnail Picture</strong>
-                <span>JPEG only · Maximum 250 KB · Displayed on public site</span>
+                <strong id="thumbnailDropTitle">Choose a Vlog Thumbnail Picture</strong>
+                <span id="thumbnailDropSubtitle">JPEG only · Maximum 250 KB · Displayed on public site</span>
               </label>
               <div id="thumbnailPreview" class="upload-preview hidden"></div>
-              <button class="primary" type="submit">Publish to journal <span>↗</span></button>
+              <button class="primary" id="publishButton" type="submit">Publish to journal <span>↗</span></button>
               <p class="form-error" id="uploadError"></p>
               <p class="form-success" id="uploadSuccess"></p>
             </form>

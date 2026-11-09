@@ -467,9 +467,201 @@ if(thumbnailInput && thumbnailPreview){
 }
 
 let isPublishing=false;
+let currentEditingVlogId=null;
+let currentArchiveItems=[];
+
+const cancelEditBtn=document.querySelector('#cancelEditBtn');
+if(cancelEditBtn){
+  cancelEditBtn.addEventListener('click',()=>exitEditMode());
+}
+
+function startEditingVlog(vlog){
+  if(!vlog)return;
+  currentEditingVlogId=vlog.id;
+  const editVlogId=document.querySelector('#editVlogId');
+  if(editVlogId) editVlogId.value=vlog.id;
+
+  const formKicker=document.querySelector('#formKicker');
+  const formTitle=document.querySelector('#formTitle');
+  const submitBtn=uploadForm.querySelector('button[type="submit"]');
+  const docDropTitle=document.querySelector('#docDropTitle');
+  const docDropSubtitle=document.querySelector('#docDropSubtitle');
+  const errEl=document.querySelector('#uploadError');
+  const succEl=document.querySelector('#uploadSuccess');
+  if(errEl) errEl.textContent='';
+  if(succEl) succEl.textContent='';
+
+  if(formKicker) formKicker.textContent='Editing publication';
+  if(formTitle) formTitle.textContent=`Edit: ${vlog.title}`;
+  if(cancelEditBtn) cancelEditBtn.classList.remove('hidden');
+  if(submitBtn) submitBtn.innerHTML='Save & update vlog <span>↗</span>';
+  if(docDropTitle) docDropTitle.textContent='Replace Word document (optional)';
+  if(docDropSubtitle) docDropSubtitle.textContent='DOC or DOCX · Leave empty to keep existing text';
+  fileInput.required=false;
+
+  // Prepopulate standard fields
+  const titleInput=uploadForm.querySelector('input[name="title"]');
+  const categorySelect=uploadForm.querySelector('select[name="category"]');
+  const authorInput=uploadForm.querySelector('input[name="author"]');
+  const excerptTextarea=uploadForm.querySelector('textarea[name="excerpt"]');
+
+  if(titleInput) titleInput.value=vlog.title||'';
+  if(categorySelect) categorySelect.value=vlog.category||'Culture';
+  if(authorInput) authorInput.value=vlog.author||'';
+  if(excerptTextarea) excerptTextarea.value=vlog.excerpt||'';
+
+  if(authorBioInput){
+    authorBioInput.value=vlog.author_bio||'';
+    updateAuthorBioWordCount();
+  }
+
+  // Prepopulate editable document preview textbox
+  if(docPreviewContainer) docPreviewContainer.classList.remove('hidden');
+  if(docPreviewText){
+    docPreviewText.value=vlog.body_text||'';
+    updateDocPreviewWordCount();
+  }
+
+  // Clear file inputs and reset removal flags
+  fileInput.value='';
+  if(thumbnailInput) thumbnailInput.value='';
+  if(authorImageInput) authorImageInput.value='';
+  const remThumb=document.querySelector('#removeThumbnailField');
+  const remAuth=document.querySelector('#removeAuthorImageField');
+  if(remThumb) remThumb.value='0';
+  if(remAuth) remAuth.value='0';
+
+  // Thumbnail preview
+  if(thumbnailPreview){
+    if(vlog.thumbnail_filename){
+      thumbnailPreview.innerHTML=`
+        <div class="preview-section">
+          <span class="kicker">Current Thumbnail Picture</span>
+          <div class="thumbnail-preview-card">
+            <div class="thumbnail-preview-frame" style="background-image:url('/uploads/${encodeURIComponent(vlog.thumbnail_filename)}')">
+              <span class="thumbnail-preview-badge">Current Thumbnail</span>
+              <div class="thumbnail-preview-info">
+                <div>
+                  <strong>${esc(vlog.thumbnail_filename)}</strong>
+                  <small>Active on public site · Choose a new file below to replace</small>
+                </div>
+                <button type="button" class="thumbnail-remove-btn" id="removeThumbnailBtn">Remove ×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      thumbnailPreview.classList.remove('hidden');
+      const remBtn=thumbnailPreview.querySelector('#removeThumbnailBtn');
+      if(remBtn){
+        remBtn.addEventListener('click',()=>{
+          if(remThumb) remThumb.value='1';
+          thumbnailPreview.innerHTML='';
+          thumbnailPreview.classList.add('hidden');
+        });
+      }
+    } else {
+      thumbnailPreview.innerHTML='';
+      thumbnailPreview.classList.add('hidden');
+    }
+  }
+
+  // Author image preview
+  if(authorImagePreview){
+    if(vlog.author_image_filename){
+      authorImagePreview.innerHTML=`
+        <div class="preview-section">
+          <span class="kicker">Current Author Picture</span>
+          <div class="author-preview-card">
+            <div class="author-preview-avatar" style="background-image:url('/uploads/${encodeURIComponent(vlog.author_image_filename)}')"></div>
+            <div class="author-preview-details">
+              <strong>${esc(vlog.author_image_filename)}</strong>
+              <small>Active with author bio · Choose a new file below to replace</small>
+            </div>
+            <button type="button" class="author-remove-btn" id="removeAuthorImageBtn">Remove ×</button>
+          </div>
+        </div>
+      `;
+      authorImagePreview.classList.remove('hidden');
+      const remBtn=authorImagePreview.querySelector('#removeAuthorImageBtn');
+      if(remBtn){
+        remBtn.addEventListener('click',()=>{
+          if(remAuth) remAuth.value='1';
+          authorImagePreview.innerHTML='';
+          authorImagePreview.classList.add('hidden');
+        });
+      }
+    } else {
+      authorImagePreview.innerHTML='';
+      authorImagePreview.classList.add('hidden');
+    }
+  }
+
+  // Highlight active row in recent films
+  document.querySelectorAll('.recent-item').forEach(el=>{
+    if(String(el.dataset.id)===String(vlog.id)){
+      el.classList.add('is-editing');
+      const hint=el.querySelector('.recent-edit-hint');
+      if(hint) hint.textContent='✎ Currently editing';
+    } else {
+      el.classList.remove('is-editing');
+      const hint=el.querySelector('.recent-edit-hint');
+      if(hint) hint.textContent='✎ Click to edit';
+    }
+  });
+
+  uploadForm.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exitEditMode(){
+  currentEditingVlogId=null;
+  const editVlogId=document.querySelector('#editVlogId');
+  if(editVlogId) editVlogId.value='';
+
+  const remThumb=document.querySelector('#removeThumbnailField');
+  const remAuth=document.querySelector('#removeAuthorImageField');
+  if(remThumb) remThumb.value='0';
+  if(remAuth) remAuth.value='0';
+
+  const formKicker=document.querySelector('#formKicker');
+  const formTitle=document.querySelector('#formTitle');
+  const submitBtn=uploadForm.querySelector('button[type="submit"]');
+  const docDropTitle=document.querySelector('#docDropTitle');
+  const docDropSubtitle=document.querySelector('#docDropSubtitle');
+
+  if(formKicker) formKicker.textContent='New publication';
+  if(formTitle) formTitle.textContent='Upload a vlog';
+  if(cancelEditBtn) cancelEditBtn.classList.add('hidden');
+  if(submitBtn) submitBtn.innerHTML='Publish to journal <span>↗</span>';
+  if(docDropTitle) docDropTitle.textContent='Choose a Word document';
+  if(docDropSubtitle) docDropSubtitle.textContent='DOC or DOCX · Maximum file size 5 MB';
+  fileInput.required=true;
+
+  uploadForm.reset();
+  if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
+  if(docPreviewText) docPreviewText.value='';
+  if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+  if(authorBioWordCount) authorBioWordCount.textContent='0 / 200 words';
+  if(authorImagePreview){
+    authorImagePreview.innerHTML='';
+    authorImagePreview.classList.add('hidden');
+  }
+  if(thumbnailPreview){
+    thumbnailPreview.innerHTML='';
+    thumbnailPreview.classList.add('hidden');
+  }
+
+  document.querySelectorAll('.recent-item').forEach(el=>{
+    el.classList.remove('is-editing');
+    const hint=el.querySelector('.recent-edit-hint');
+    if(hint) hint.textContent='✎ Click to edit';
+  });
+}
+
 uploadForm.addEventListener('submit',async e=>{
   e.preventDefault();
   if(isPublishing)return;
+  const isEditing=Boolean(currentEditingVlogId);
   const submitBtn=uploadForm.querySelector('button[type="submit"]');
   const errEl=document.querySelector('#uploadError');
   const succEl=document.querySelector('#uploadSuccess');
@@ -492,32 +684,30 @@ uploadForm.addEventListener('submit',async e=>{
     }
   }
 
+  const endpoint=isEditing?`/api/admin/vlogs/${currentEditingVlogId}/update`:'/api/admin/vlogs';
   isPublishing=true;
-  if(submitBtn){submitBtn.disabled=true;submitBtn.style.opacity='0.6';submitBtn.innerHTML='Publishing to journal… <span>⏳</span>';}
+  if(submitBtn){
+    submitBtn.disabled=true;
+    submitBtn.style.opacity='0.6';
+    submitBtn.innerHTML=isEditing?'Saving updates… <span>⏳</span>':'Publishing to journal… <span>⏳</span>';
+  }
+
   try{
-    const result=await api('/api/admin/vlogs',{method:'POST',body:new FormData(uploadForm)});
-    succEl.textContent='Published successfully — '+result.word_count+' words'+(result.thumbnail_filename?' with custom thumbnail.':'.');
-    uploadForm.reset();
-    if(docPreviewContainer){
-      docPreviewContainer.classList.add('hidden');
-      if(docPreviewText) docPreviewText.value='';
-      if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
-    }
-    if(authorBioWordCount) authorBioWordCount.textContent='0 / 200 words';
-    if(authorImagePreview){
-      authorImagePreview.innerHTML='';
-      authorImagePreview.classList.add('hidden');
-    }
-    if(thumbnailPreview){
-      thumbnailPreview.innerHTML='';
-      thumbnailPreview.classList.add('hidden');
-    }
-    loadArchive();
+    const result=await api(endpoint,{method:'POST',body:new FormData(uploadForm)});
+    succEl.textContent=isEditing
+      ? `Updated successfully — "${result.title}" (${result.word_count} words).`
+      : `Published successfully — ${result.word_count} words${result.thumbnail_filename?' with custom thumbnail.':'.'}`;
+    exitEditMode();
+    await loadArchive(false);
   }catch(error){
     errEl.textContent=error.message;
   }finally{
     isPublishing=false;
-    if(submitBtn){submitBtn.disabled=false;submitBtn.style.opacity='1';submitBtn.innerHTML='Publish to journal <span>↗</span>';}
+    if(submitBtn){
+      submitBtn.disabled=false;
+      submitBtn.style.opacity='1';
+      submitBtn.innerHTML=isEditing?'Save & update vlog <span>↗</span>':'Publish to journal <span>↗</span>';
+    }
   }
 });
 
@@ -525,16 +715,49 @@ let lastArchiveRaw='';
 async function loadArchive(isPoll=false){
   try{
     const items=await api('/api/vlogs?t='+Date.now());
+    currentArchiveItems=items||[];
     const rawCheck=JSON.stringify(items);
     if(isPoll && rawCheck===lastArchiveRaw) return;
     lastArchiveRaw=rawCheck;
 
     document.querySelector('#vlogCount').textContent=items.length;
     const list=document.querySelector('#recentList');
-    list.innerHTML=items.length?items.map(v=>`<div class="recent-item"><strong>${esc(v.title)}</strong><small>${esc(v.category)} · ${esc(v.author)} · ${v.word_count} words${v.thumbnail_filename?' · 🖼️ Custom JPEG':''}${v.author_image_filename?' · 👤 Author Picture':''}</small><button class="delete-btn" data-id="${v.id}" title="Delete vlog">×</button></div>`).join(''):'<p class="muted">No uploaded films yet.</p>';
-    document.querySelectorAll('.delete-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(!items.length){
+      list.innerHTML='<p class="muted">No uploaded films yet.</p>';
+      return;
+    }
+
+    list.innerHTML=items.map(v=>{
+      const isEditing=currentEditingVlogId && String(currentEditingVlogId)===String(v.id);
+      return `
+        <div class="recent-item ${isEditing?'is-editing':''}" data-id="${v.id}" title="Click to edit this vlog">
+          <div>
+            <strong>${esc(v.title)}</strong>
+            <small>${esc(v.category)} · ${esc(v.author)} · ${v.word_count} words${v.thumbnail_filename?' · 🖼️ Custom JPEG':''}${v.author_image_filename?' · 👤 Author Picture':''}</small>
+            <span class="recent-edit-hint">${isEditing?'✎ Currently editing':'✎ Click to edit'}</span>
+          </div>
+          <button class="delete-btn" data-id="${v.id}" title="Delete vlog">×</button>
+        </div>
+      `;
+    }).join('');
+
+    // Attach click-to-edit listener on each item
+    list.querySelectorAll('.recent-item').forEach(item=>{
+      item.addEventListener('click',e=>{
+        if(e.target.closest('.delete-btn'))return;
+        const vlog=currentArchiveItems.find(x=>String(x.id)===String(item.dataset.id));
+        if(vlog) startEditingVlog(vlog);
+      });
+    });
+
+    list.querySelectorAll('.delete-btn').forEach(btn=>btn.addEventListener('click',async e=>{
+      e.stopPropagation();
       if(!confirm('Delete this vlog? This cannot be undone.'))return;
-      try{await api(`/api/admin/vlogs/${btn.dataset.id}`,{method:'DELETE'});loadArchive(false);}catch(err){alert(err.message);}
+      const delId=btn.dataset.id;
+      if(currentEditingVlogId && String(currentEditingVlogId)===String(delId)){
+        exitEditMode();
+      }
+      try{await api(`/api/admin/vlogs/${delId}`,{method:'DELETE'});loadArchive(false);}catch(err){alert(err.message);}
     }));
   }catch(error){console.error(error);}
 }

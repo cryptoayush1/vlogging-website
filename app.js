@@ -116,6 +116,44 @@ async function loadPublishedVlogs(){
 
     vlogs = customList;
     renderVlogs(vlogs);
+
+    // If modal is currently open for an edited vlog, update its reader view live
+    if (dialog && dialog.open && currentOpenVlog) {
+      const updatedVlog = vlogs.find(item => item.id === currentOpenVlog.id || (item.title === currentOpenVlog.title && !currentOpenVlog.id));
+      if (updatedVlog) {
+        currentOpenVlog = updatedVlog;
+        const readerCategory = document.querySelector('#readerCategory');
+        const readerDate = document.querySelector('#readerDate');
+        const readerTitle = document.querySelector('#readerTitle');
+        const readerExcerpt = document.querySelector('#readerExcerpt');
+        const readerLength = document.querySelector('#readerLength');
+        const readerBody = document.querySelector('#readerBody');
+        const readerAuthorName = document.querySelector('#readerAuthorName');
+        const readerAuthorBio = document.querySelector('#readerAuthorBio');
+        const readerAuthorAvatar = document.querySelector('#readerAuthorAvatar');
+
+        if (readerCategory) readerCategory.textContent = updatedVlog.category;
+        if (readerDate) readerDate.textContent = updatedVlog.date;
+        if (readerTitle) readerTitle.textContent = updatedVlog.title;
+        if (readerExcerpt) readerExcerpt.textContent = updatedVlog.excerpt;
+        if (readerLength) readerLength.textContent = updatedVlog.length;
+        if (readerBody && updatedVlog.body_text) {
+          const paras = updatedVlog.body_text.split(/\n\s*\n/).filter(p => p.trim());
+          readerBody.innerHTML = paras.map(p => `<p>${esc(p.trim())}</p>`).join('');
+        }
+        if (readerAuthorName) readerAuthorName.textContent = updatedVlog.author || 'Field Notes Author';
+        if (readerAuthorBio) readerAuthorBio.textContent = updatedVlog.author_bio || 'Contributor to the Field Notes journal archive.';
+        if (readerAuthorAvatar) {
+          if (updatedVlog.author_image_filename) {
+            readerAuthorAvatar.textContent = '';
+            readerAuthorAvatar.style.backgroundImage = `url('/uploads/${encodeURIComponent(updatedVlog.author_image_filename)}')`;
+          } else {
+            readerAuthorAvatar.style.backgroundImage = '';
+            readerAuthorAvatar.textContent = (updatedVlog.author || 'F').charAt(0).toUpperCase();
+          }
+        }
+      }
+    }
   } catch (error) {
     // Keep existing vlogs on transient connection failure
   }
