@@ -8,6 +8,7 @@ function showDashboard(user){
   loginView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
   document.querySelector('#accountLabel').textContent=`${currentUser.username} · ${currentUser.role}`;
+  checkSetupStatus();
   loadArchive();
   if(currentUser.role==='admin'){
     showAdminTools();
@@ -586,6 +587,11 @@ async function loadUsers(){
 async function checkSetupStatus(){
   try{
     const res=await api('/api/admin/setup-status');
+    const statusDot=document.querySelector('#studioStatusDot');
+    if(statusDot && res && res.database==='turso'){
+      statusDot.textContent='● Studio online · Turso Cloud DB';
+      statusDot.title='Connected to Turso Cloud SQLite. Data persists permanently across restarts.';
+    }
     const roleSelect=document.querySelector('#roleSelect');
     const optAdmin=document.querySelector('#optAdmin');
     const optCoadmin=document.querySelector('#optCoadmin');

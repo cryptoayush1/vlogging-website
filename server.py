@@ -735,7 +735,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == '/api/admin/setup-status':
             with db() as conn:
                 has_admin = bool(conn.execute('SELECT 1 FROM users WHERE role="admin" LIMIT 1').fetchone())
-            return self.send_json(200, {'has_admin': has_admin})
+                db_type = 'turso' if isinstance(conn, TursoConnection) else 'local_sqlite'
+            return self.send_json(200, {'has_admin': has_admin, 'database': db_type})
         if parsed.path == '/api/vlogs':
             with db() as conn: rows = [dict(row) for row in conn.execute('SELECT * FROM vlogs ORDER BY created_at DESC')]
             return self.send_json(200, rows)
