@@ -359,7 +359,7 @@ def verify_password(password: str, encoded: str) -> bool:
 def validate_registration(conn, username, email, password, repeat_password, role):
     if role not in ('admin', 'coadmin'): raise ValueError('Invalid account role.')
     if role == 'admin':
-        admin_count = conn.execute('SELECT COUNT(*) FROM users WHERE role="admin"').fetchone()[0]
+        admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
         if admin_count >= 1:
             raise ValueError('An administrator account already exists. Only co-admin accounts can be registered.')
     if not re.fullmatch(r'[A-Za-z0-9_.-]{3,40}', username or ''): raise ValueError('Username must be 3-40 letters, numbers, dots, dashes, or underscores.')
@@ -372,7 +372,7 @@ def validate_registration(conn, username, email, password, repeat_password, role
 def create_user(conn, username: str, password: str, role: str = 'coadmin', email: str = '') -> int:
     if role not in {'admin', 'coadmin'}: raise ValueError('Role must be admin or coadmin.')
     if role == 'admin':
-        admin_count = conn.execute('SELECT COUNT(*) FROM users WHERE role="admin"').fetchone()[0]
+        admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
         if admin_count >= 1:
             raise ValueError('An administrator account already exists. Only co-admin accounts can be registered.')
     if len(username.strip()) < 3 or len(password) < 8: raise ValueError('Username must have 3 characters and password 8 characters.')
@@ -385,7 +385,7 @@ def authenticate_user(conn, username: str, password: str):
 
 
 def set_user_active(conn, user_id: int, active: bool):
-    conn.execute('UPDATE users SET active=? WHERE id=? AND role="coadmin"', (int(active), user_id)); conn.commit()
+    conn.execute("UPDATE users SET active=? WHERE id=? AND role='coadmin'", (int(active), user_id)); conn.commit()
 
 
 def list_users(conn):
@@ -393,7 +393,7 @@ def list_users(conn):
 
 
 def ensure_admin(conn):
-    if conn.execute('SELECT COUNT(*) FROM users WHERE role="admin"').fetchone()[0] == 0:
+    if conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0] == 0:
         username = os.getenv('ADMIN_USERNAME')
         password = os.getenv('ADMIN_PASSWORD')
         email = os.getenv('ADMIN_EMAIL', f'{username}@local.invalid') if username else ''
@@ -653,17 +653,17 @@ def db():
     if 'user_id' not in cols:
         conn.execute('ALTER TABLE vlogs ADD COLUMN user_id INTEGER REFERENCES users(id)')
     if 'body_text' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN body_text TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN body_text TEXT DEFAULT ''")
     if 'thumbnail_filename' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN thumbnail_filename TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_filename TEXT DEFAULT ''")
     if 'author_image_filename' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ''")
     if 'author_bio' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ''")
     if 'thumbnail_data' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN thumbnail_data TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN thumbnail_data TEXT DEFAULT ''")
     if 'author_image_data' not in cols:
-        conn.execute('ALTER TABLE vlogs ADD COLUMN author_image_data TEXT DEFAULT ""')
+        conn.execute("ALTER TABLE vlogs ADD COLUMN author_image_data TEXT DEFAULT ''")
     init_db(conn)
     ensure_admin(conn)
     conn.commit()
@@ -737,7 +737,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == '/api/admin/setup-status':
             with db() as conn:
-                has_admin = bool(conn.execute('SELECT 1 FROM users WHERE role="admin" LIMIT 1').fetchone())
+                has_admin = bool(conn.execute("SELECT 1 FROM users WHERE role='admin' LIMIT 1").fetchone())
                 db_type = 'turso' if isinstance(conn, TursoConnection) else 'local_sqlite'
             return self.send_json(200, {'has_admin': has_admin, 'database': db_type})
         if parsed.path == '/api/vlogs':
@@ -966,7 +966,7 @@ class Handler(BaseHTTPRequestHandler):
                     if len(username) < 3 or len(password) < 8:
                         raise ValueError('Username must have 3 characters and password 8 characters.')
                     with db() as conn:
-                        if conn.execute('SELECT 1 FROM users WHERE username=? OR (email=? AND email != "")', (username, email)).fetchone():
+                        if conn.execute("SELECT 1 FROM users WHERE username=? OR (email=? AND email != '')", (username, email)).fetchone():
                             raise ValueError('Username or email already exists.')
                         user_id = create_user(conn, username, password, 'coadmin', email)
                     if email and not email.endswith('@local.invalid'):
@@ -985,7 +985,7 @@ class Handler(BaseHTTPRequestHandler):
             try: body = json.loads(self.read_body()); user_id, active = int(body['id']), bool(body['active'])
             except (KeyError, TypeError, ValueError, json.JSONDecodeError): return self.send_json(400, {'error': 'Invalid user status request.'})
             with db() as conn:
-                user = conn.execute('SELECT * FROM users WHERE id=? AND role="coadmin"', (user_id,)).fetchone()
+                user = conn.execute("SELECT * FROM users WHERE id=? AND role='coadmin'", (user_id,)).fetchone()
                 if not user: return self.send_json(404, {'error': 'Co-admin not found.'})
                 set_user_active(conn, user_id, active)
                 target_email = user['email']
@@ -1002,10 +1002,10 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self.send_json(400, {'error': 'Invalid user ID.'})
             with db() as conn:
-                target = conn.execute('SELECT * FROM users WHERE id=? AND role="coadmin"', (target_id,)).fetchone()
+                target = conn.execute("SELECT * FROM users WHERE id=? AND role='coadmin'", (target_id,)).fetchone()
                 if not target:
                     return self.send_json(404, {'error': 'Co-admin not found.'})
-                admin = conn.execute('SELECT id FROM users WHERE role="admin" LIMIT 1').fetchone()
+                admin = conn.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
                 if not admin:
                     return self.send_json(500, {'error': 'No admin user found.'})
                 # Reassign vlogs from co-admin to admin
