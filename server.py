@@ -29,8 +29,12 @@ ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / 'field_notes.db'
 UPLOAD_DIR = ROOT / 'uploads'
 MAX_WORDS = 1500
+MAX_DOCUMENT_BYTES = 5 * 1024 * 1024  # 5 MB max for Word documents
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_THUMBNAIL_BYTES = 250 * 1024
+MAX_THUMBNAIL_BYTES = 250 * 1024  # 250 KB
+MAX_AUTHOR_IMAGE_BYTES = 200 * 1024  # 200 KB
+MAX_AUTHOR_BIO_WORDS = 200  # 200 words
+MAX_PREVIEW_WORDS = 6000  # 6,000 words
 
 SESSIONS: dict[str, dict] = {}
 SESSION_MAX_AGE = 8 * 3600  # 8 hours
@@ -437,6 +441,19 @@ def is_allowed_thumbnail(filename: str, data: bytes) -> bool:
     return True
 
 
+def is_allowed_author_image(filename: str, data: bytes) -> bool:
+    ext = Path(filename).suffix.lower()
+    if ext in {'.jpg', '.jpeg'}:
+        return len(data) >= 3 and data[:3] == b'\xff\xd8\xff'
+    elif ext == '.png':
+        return len(data) >= 8 and data[:8] == b'\x89PNG\r\n\x1a\n'
+    return False
+
+
+def text_word_count(text: str) -> int:
+    return len(re.findall(r"[\w’'-]+", text or ''))
+
+
 def docx_body_text(data: bytes) -> str:
     """Extract body text from a .docx preserving paragraph breaks."""
     try:
@@ -488,7 +505,8 @@ def db():
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL,
     author TEXT NOT NULL, excerpt TEXT NOT NULL, filename TEXT NOT NULL,
     word_count INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, user_id INTEGER REFERENCES users(id),
-    body_text TEXT DEFAULT '', thumbnail_filename TEXT DEFAULT '')''')
+    body_text TEXT DEFAULT '', thumbnail_filename TEXT DEFAULT '',
+    author_image_filename TEXT DEFAULT '', author_bio TEXT DEFAULT '')''')
     # Add columns if missing (migration)
     cols = [row['name'] for row in conn.execute("PRAGMA table_info(vlogs)")]
     if 'user_id' not in cols:
@@ -497,6 +515,10 @@ def db():
         conn.execute('ALTER TABLE vlogs ADD COLUMN body_text TEXT DEFAULT ""')
     if 'thumbnail_filename' not in cols:
         conn.execute('ALTER TABLE vlogs ADD COLUMN thumbnail_filename TEXT DEFAULT ""')
+    if 'author_image_filename' not in cols:
+        conn.execute('ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ""')
+    if 'author_bio' not in cols:
+        conn.execute('ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ""')
     init_db(conn)
     ensure_admin(conn)
     conn.commit()
@@ -648,7 +670,15 @@ class Handler(BaseHTTPRequestHandler):
             path = UPLOAD_DIR / filename
             if not path.is_file(): return self.send_json(404, {'error': 'Not found.'})
             data = path.read_bytes()
-            content_type = 'image/jpeg' if path.suffix.lower() in ('.jpg', '.jpeg') else 'application/octet-stream'
+            ext = path.suffix.lower()
+            if ext in ('.jpg', '.jpeg'):
+                content_type = 'image/jpeg'
+            elif ext == '.png':
+                content_type = 'image/png'
+            elif ext == '.webp':
+                content_type = 'image/webp'
+            else:
+                content_type = 'application/octet-stream'
             self.send_response(200)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(data)))
@@ -832,9 +862,11 @@ class Handler(BaseHTTPRequestHandler):
                 file = parts.get('document', {}); filename = file.get('filename') or ''
                 data = file.get('data', b'')
                 if not is_allowed_document(filename): raise ValueError('Only .doc and .docx files are supported.')
-                if not data or len(data) > MAX_UPLOAD_BYTES: raise ValueError('File is empty or exceeds the 10 MB limit.')
+                if not data: raise ValueError('File is empty.')
+                if len(data) > MAX_DOCUMENT_BYTES: raise ValueError(f'Word document exceeds the 5 MB limit ({round(len(data) / (1024 * 1024), 2)} MB).')
                 body_text = extract_body_text(data, filename)
-                return self.send_json(200, {'body_text': body_text, 'word_count': word_count(data, filename)})
+                count = text_word_count(body_text) if body_text else word_count(data, filename)
+                return self.send_json(200, {'body_text': body_text, 'word_count': count})
             except ValueError as error: return self.send_json(400, {'error': str(error)})
             except Exception as error: return self.send_json(500, {'error': 'Preview failed. Please try again.'})
         if parsed.path == '/api/admin/vlogs' and self.command == 'POST':
@@ -842,17 +874,39 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 body = self.read_body(); parts = parse_multipart(body, self.headers.get('Content-Type', ''))
                 file = parts.get('document', {}); filename = file.get('filename') or ''
-                title = parts.get('title', {}).get('data', b'').decode().strip(); category = parts.get('category', {}).get('data', b'').decode().strip(); author = parts.get('author', {}).get('data', b'').decode().strip(); excerpt = parts.get('excerpt', {}).get('data', b'').decode().strip()
+                title = parts.get('title', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                category = parts.get('category', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                author = parts.get('author', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                excerpt = parts.get('excerpt', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                author_bio = parts.get('author_bio', {}).get('data', b'').decode('utf-8', 'ignore').strip()
+                submitted_body = parts.get('body_text', {}).get('data', b'').decode('utf-8', 'ignore').strip()
                 data = file.get('data', b'')
+
                 if not all([title, category, author, excerpt]): raise ValueError('Title, category, author, and excerpt are required.')
                 if not is_allowed_document(filename): raise ValueError('Only .doc and .docx files are supported.')
-                if not data or len(data) > MAX_UPLOAD_BYTES: raise ValueError('File is empty or exceeds the 10 MB limit.')
-                count = word_count(data, filename)
-                if count > MAX_WORDS: raise ValueError(f'Document contains {count} words; maximum is {MAX_WORDS}.')
-                body_text = extract_body_text(data, filename)
-                safe_name = secrets.token_hex(8) + Path(filename).suffix.lower(); UPLOAD_DIR.mkdir(exist_ok=True); (UPLOAD_DIR / safe_name).write_bytes(data)
+                if not data: raise ValueError('Word document file is empty.')
+                if len(data) > MAX_DOCUMENT_BYTES: raise ValueError(f'Word document exceeds the 5 MB limit ({round(len(data) / (1024 * 1024), 2)} MB).')
 
-                # Process thumbnail picture if provided
+                # Author bio word limit check: max 200 words
+                if author_bio:
+                    bio_words = text_word_count(author_bio)
+                    if bio_words > MAX_AUTHOR_BIO_WORDS:
+                        raise ValueError(f'Author bio exceeds the 200-word limit ({bio_words} words).')
+
+                # Body text: prefer submitted_body (from editable preview), fallback to extracted
+                doc_text = extract_body_text(data, filename)
+                final_body = submitted_body if submitted_body else doc_text
+                final_word_count = text_word_count(final_body) if final_body else word_count(data, filename)
+
+                # Preview / editable body word limit: max 6,000 words
+                if final_word_count > MAX_PREVIEW_WORDS:
+                    raise ValueError(f'Document text exceeds the 6,000-word limit ({final_word_count} words).')
+
+                safe_name = secrets.token_hex(8) + Path(filename).suffix.lower()
+                UPLOAD_DIR.mkdir(exist_ok=True)
+                (UPLOAD_DIR / safe_name).write_bytes(data)
+
+                # Process thumbnail picture if provided (max 250 KB, JPEG)
                 thumb_part = parts.get('thumbnail', {})
                 thumb_filename = thumb_part.get('filename') or ''
                 thumb_data = thumb_part.get('data', b'')
@@ -865,9 +919,37 @@ class Handler(BaseHTTPRequestHandler):
                     safe_thumb_name = 'thumb_' + secrets.token_hex(8) + '.jpg'
                     (UPLOAD_DIR / safe_thumb_name).write_bytes(thumb_data)
 
+                # Process author picture if provided (under 200 KB, JPEG/PNG)
+                author_img_part = parts.get('author_image', {})
+                author_img_filename = author_img_part.get('filename') or ''
+                author_img_data = author_img_part.get('data', b'')
+                safe_author_img_name = ''
+                if author_img_filename and author_img_data:
+                    if len(author_img_data) > MAX_AUTHOR_IMAGE_BYTES:
+                        raise ValueError(f'Author picture exceeds the 200 KB limit ({round(len(author_img_data) / 1024, 1)} KB).')
+                    if not is_allowed_author_image(author_img_filename, author_img_data):
+                        raise ValueError('Only JPEG and PNG images (.jpg, .jpeg, .png) are supported for author pictures.')
+                    ext = Path(author_img_filename).suffix.lower()
+                    if ext == '.jpeg': ext = '.jpg'
+                    safe_author_img_name = 'author_' + secrets.token_hex(8) + ext
+                    (UPLOAD_DIR / safe_author_img_name).write_bytes(author_img_data)
+
                 user = self.authenticated()
-                with db() as conn: cursor = conn.execute('INSERT INTO vlogs(title,category,author,excerpt,filename,word_count,user_id,body_text,thumbnail_filename) VALUES(?,?,?,?,?,?,?,?,?)', (title, category, author, excerpt, safe_name, count, user['id'], body_text, safe_thumb_name)); vlog_id = cursor.lastrowid
-                return self.send_json(201, {'id': vlog_id, 'title': title, 'word_count': count, 'body_text': body_text, 'thumbnail_filename': safe_thumb_name})
+                with db() as conn:
+                    cursor = conn.execute(
+                        'INSERT INTO vlogs(title,category,author,excerpt,filename,word_count,user_id,body_text,thumbnail_filename,author_image_filename,author_bio) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                        (title, category, author, excerpt, safe_name, final_word_count, user['id'], final_body, safe_thumb_name, safe_author_img_name, author_bio)
+                    )
+                    vlog_id = cursor.lastrowid
+                return self.send_json(201, {
+                    'id': vlog_id,
+                    'title': title,
+                    'word_count': final_word_count,
+                    'body_text': final_body,
+                    'thumbnail_filename': safe_thumb_name,
+                    'author_image_filename': safe_author_img_name,
+                    'author_bio': author_bio
+                })
             except ValueError as error: return self.send_json(400, {'error': str(error)})
             except Exception as error: return self.send_json(500, {'error': 'Upload failed. Please try again.'})
         if parsed.path.startswith('/api/admin/vlogs/') and self.command == 'DELETE':
@@ -877,12 +959,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self.send_json(400, {'error': 'Invalid vlog ID.'})
             with db() as conn:
-                row = conn.execute('SELECT title, filename, thumbnail_filename FROM vlogs WHERE id=?', (vlog_id,)).fetchone()
+                row = conn.execute('SELECT title, filename, thumbnail_filename, author_image_filename FROM vlogs WHERE id=?', (vlog_id,)).fetchone()
                 if not row:
                     return self.send_json(404, {'error': 'Vlog not found.'})
                 title = row['title']
                 filename = row['filename']
                 thumb_filename = row['thumbnail_filename'] if 'thumbnail_filename' in row.keys() else ''
+                author_img_filename = row['author_image_filename'] if 'author_image_filename' in row.keys() else ''
                 # Clean up all associated analytical event data and reader feedback
                 conn.execute('DELETE FROM analytics_events WHERE (vlog_id IS NOT NULL AND vlog_id=?) OR LOWER(vlog_title)=LOWER(?)', (vlog_id, title))
                 conn.execute('DELETE FROM feedback WHERE (vlog_id IS NOT NULL AND vlog_id=?) OR LOWER(vlog_title)=LOWER(?)', (vlog_id, title))
@@ -896,6 +979,10 @@ class Handler(BaseHTTPRequestHandler):
                 thumb_path = UPLOAD_DIR / thumb_filename
                 if thumb_path.is_file():
                     thumb_path.unlink()
+            if author_img_filename:
+                author_img_path = UPLOAD_DIR / author_img_filename
+                if author_img_path.is_file():
+                    author_img_path.unlink()
             return self.send_json(200, {'deleted': True, 'id': vlog_id, 'analytics_deleted': True})
         if parsed.path.startswith('/api/admin/feedback/') and (self.command == 'DELETE' or parsed.path.endswith('/delete')):
             if not self.require_role('admin'):

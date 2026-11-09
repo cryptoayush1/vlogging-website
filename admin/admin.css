@@ -57,6 +57,15 @@
 .thumbnail-remove-btn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:2px;cursor:pointer;transition:all .2s}
 .thumbnail-remove-btn:hover{background:#b43434;border-color:#b43434}
 
+/* Author Picture Preview */
+.author-preview-card{display:flex;align-items:center;gap:16px;background:var(--paper);border:1px solid var(--line);padding:14px 18px;border-radius:4px}
+.author-preview-avatar{width:60px;height:60px;border-radius:50%;background-size:cover;background-position:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.08);flex-shrink:0}
+.author-preview-details{flex:1}
+.author-preview-details strong{display:block;font-size:13px;color:var(--ink)}
+.author-preview-details small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.author-remove-btn{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:11px;font-weight:600;padding:5px 12px;border-radius:3px;cursor:pointer;transition:all .2s}
+.author-remove-btn:hover{background:#b43434;color:#fff;border-color:#b43434}
+
 @media(max-width:950px){
   .workspace{grid-template-columns:1fr}
 }

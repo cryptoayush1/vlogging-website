@@ -83,4 +83,10 @@ dialog#vlogDialog{max-height:92vh;overflow-y:auto}
 .feedback-form button.primary-btn span{color:var(--lime)}
 .feedback-form .form-success{color:#3f7514;font-size:12px;margin-top:10px}
 .feedback-form .form-error{color:#b43434;font-size:12px;margin-top:10px}
+/* Reader Author Card */
+.reader-author-card{display:flex;align-items:center;gap:18px;background:#fff;border:1px solid var(--line);padding:18px 20px;margin-top:28px;border-radius:4px}
+.reader-author-avatar{width:56px;height:56px;border-radius:50%;background:#e0e2db;color:var(--ink);font-weight:700;display:grid;place-items:center;font-size:18px;flex-shrink:0;background-size:cover;background-position:center;border:1px solid var(--line)}
+.reader-author-info{flex:1}
+.reader-author-info strong{display:block;font-size:15px;color:var(--ink);margin-bottom:4px}
+.reader-author-info p{font-size:13px;line-height:1.6;color:var(--muted);margin:0}
 @media(max-width:600px){.feedback-row{grid-template-columns:1fr}}

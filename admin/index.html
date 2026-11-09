@@ -30,8 +30,8 @@
         </div>
         <div class="stats">
           <div><b id="vlogCount">0</b><span>Published films</span></div>
-          <div><b>1,500</b><span>Word limit</span></div>
-          <div><b>DOCX</b><span>Accepted format</span></div>
+          <div><b>5 MB</b><span>File size limit</span></div>
+          <div><b>6,000</b><span>Preview word limit</span></div>
         </div>
         <div class="workspace">
           <section class="panel">
@@ -53,11 +53,36 @@
               </div>
               <label>Author<input name="author" required placeholder="Byline"></label>
               <label>Excerpt<textarea name="excerpt" rows="3" required placeholder="A short description for the journal card"></textarea></label>
+              
               <label class="file-drop" id="docDrop">
                 <input type="file" name="document" accept=".doc,.docx" required>
                 <strong>Choose a Word document</strong>
-                <span>DOC or DOCX · maximum 1,500 words · 10 MB</span>
+                <span>DOC or DOCX · Maximum file size 5 MB</span>
               </label>
+
+              <div id="docPreviewContainer" class="upload-preview hidden" style="margin-top:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span class="kicker" style="margin:0;">Editable Document Preview</span>
+                  <span id="docPreviewWordCount" style="font-size:12px;color:var(--muted);font-weight:600;">0 / 6,000 words</span>
+                </div>
+                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="width:100%;resize:vertical;min-height:160px;font-family:inherit;font-size:14px;line-height:1.6;padding:12px;border:1px solid var(--line);border-radius:4px;background:#fbfbf9;color:var(--ink);"></textarea>
+                <small style="color:var(--muted);display:block;margin-top:6px;">Adjustable textbox · Edits made here will be published into the vlog · Max 6,000 words</small>
+              </div>
+
+              <label class="file-drop image-drop" id="authorImageDrop" style="margin-top:16px">
+                <input type="file" name="author_image" id="authorImageInput" accept="image/jpeg,image/png,.jpg,.jpeg,.png">
+                <strong>Choose an Author Picture</strong>
+                <span>JPEG or PNG · Under 200 KB · Displayed with author bio</span>
+              </label>
+              <div id="authorImagePreview" class="upload-preview hidden"></div>
+
+              <div style="margin-top:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <label for="authorBioInput" style="margin:0;font-weight:600;">Author Bio</label>
+                  <span id="authorBioWordCount" style="font-size:12px;color:var(--muted);font-weight:600;">0 / 200 words</span>
+                </div>
+                <textarea name="author_bio" id="authorBioInput" rows="3" placeholder="Write a short author bio (up to 200 words)…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);"></textarea>
+              </div>
 
               <label class="file-drop image-drop" id="thumbnailDrop" style="margin-top:16px">
                 <input type="file" name="thumbnail" id="thumbnailInput" accept="image/jpeg,.jpg,.jpeg">

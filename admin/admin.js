@@ -241,38 +241,158 @@ const uploadForm=document.querySelector('#uploadForm');
 const fileInput=uploadForm.querySelector('input[name="document"]');
 const thumbnailInput=uploadForm.querySelector('#thumbnailInput');
 const thumbnailPreview=document.querySelector('#thumbnailPreview');
-const previewEl=document.createElement('div');
-previewEl.className='upload-preview hidden';
-const docDrop=uploadForm.querySelector('#docDrop')||uploadForm.querySelector('.file-drop');
-if(docDrop&&docDrop.nextSibling){uploadForm.insertBefore(previewEl,docDrop.nextSibling);}else{uploadForm.appendChild(previewEl);}
+const authorImageInput=uploadForm.querySelector('#authorImageInput');
+const authorImagePreview=document.querySelector('#authorImagePreview');
+const authorBioInput=uploadForm.querySelector('#authorBioInput');
+const authorBioWordCount=document.querySelector('#authorBioWordCount');
+const docPreviewContainer=document.querySelector('#docPreviewContainer');
+const docPreviewText=document.querySelector('#docPreviewText');
+const docPreviewWordCount=document.querySelector('#docPreviewWordCount');
 
-function showPreview(txt, count){
-  if(!txt||!txt.trim()){
-    previewEl.innerHTML='<div class="preview-section"><span class="kicker">Document Preview</span><div class="preview-body"><p class="muted">No readable text found in document.</p></div></div>';
-    previewEl.classList.remove('hidden');
-    return;
+function countWords(str){
+  if(!str||!str.trim()) return 0;
+  return str.trim().split(/\s+/).length;
+}
+
+function updateDocPreviewWordCount(){
+  if(!docPreviewText||!docPreviewWordCount) return;
+  const count=countWords(docPreviewText.value);
+  docPreviewWordCount.textContent=`${count.toLocaleString()} / 6,000 words`;
+  if(count>6000){
+    docPreviewWordCount.style.color='#b43434';
+  } else {
+    docPreviewWordCount.style.color='var(--muted)';
   }
-  const paras=txt.split('\n').map(s=>s.trim()).filter(Boolean);
-  const wrapped=paras.map(p=>'<p>'+esc(p)+'</p>').join('');
-  const words=count!==undefined?count:txt.trim().split(/\s+/).length;
-  previewEl.innerHTML='<div class="preview-section"><span class="kicker">Full Document Preview ('+words+' words)</span><div class="preview-body">'+wrapped+'</div><small>'+words+' words · ready to publish</small></div>';
-  previewEl.classList.remove('hidden');
+}
+
+if(docPreviewText){
+  docPreviewText.addEventListener('input',updateDocPreviewWordCount);
+}
+
+function updateAuthorBioWordCount(){
+  if(!authorBioInput||!authorBioWordCount) return;
+  const count=countWords(authorBioInput.value);
+  authorBioWordCount.textContent=`${count} / 200 words`;
+  if(count>200){
+    authorBioWordCount.style.color='#b43434';
+  } else {
+    authorBioWordCount.style.color='var(--muted)';
+  }
+}
+
+if(authorBioInput){
+  authorBioInput.addEventListener('input',updateAuthorBioWordCount);
 }
 
 fileInput.addEventListener('change',async()=>{
   const f=fileInput.files[0];
-  if(!f){previewEl.classList.add('hidden');previewEl.innerHTML='';return;}
-  previewEl.classList.remove('hidden');
-  previewEl.innerHTML='<div class="preview-section"><span class="kicker">Preview</span><div class="preview-body"><p class="muted">Parsing document preview…</p></div></div>';
+  const errEl=document.querySelector('#uploadError');
+  if(errEl) errEl.textContent='';
+
+  if(!f){
+    if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
+    if(docPreviewText) docPreviewText.value='';
+    if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+    return;
+  }
+
+  // 5 MB file size limit check
+  const MAX_DOC_BYTES=5*1024*1024;
+  if(f.size>MAX_DOC_BYTES){
+    const sizeMb=(f.size/(1024*1024)).toFixed(2);
+    if(errEl) errEl.textContent=`Word document exceeds the 5 MB limit (${sizeMb} MB). Please choose a file under 5 MB.`;
+    fileInput.value='';
+    if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
+    if(docPreviewText) docPreviewText.value='';
+    if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+    return;
+  }
+
+  if(docPreviewContainer) docPreviewContainer.classList.remove('hidden');
+  if(docPreviewText) docPreviewText.value='Parsing document preview…';
+  if(docPreviewWordCount) docPreviewWordCount.textContent='Parsing…';
+
   try{
     const fd=new FormData();
     fd.append('document',f);
     const result=await api('/api/admin/vlogs/preview',{method:'POST',body:fd});
-    showPreview(result.body_text,result.word_count);
+    if(docPreviewText){
+      docPreviewText.value=result.body_text||'';
+      updateDocPreviewWordCount();
+    }
   }catch(err){
-    previewEl.innerHTML='<div class="preview-section"><span class="kicker">Preview Notice</span><div class="preview-body"><p class="form-error">'+esc(err.message)+'</p></div></div>';
+    if(errEl) errEl.textContent=err.message;
+    if(docPreviewText) docPreviewText.value='';
+    if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
   }
 });
+
+if(authorImageInput && authorImagePreview){
+  authorImageInput.addEventListener('change',()=>{
+    const file=authorImageInput.files[0];
+    const errEl=document.querySelector('#uploadError');
+    if(errEl) errEl.textContent='';
+
+    if(!file){
+      authorImagePreview.classList.add('hidden');
+      authorImagePreview.innerHTML='';
+      return;
+    }
+
+    const isImage=file.type==='image/jpeg'||file.type==='image/png'||/\.(jpe?g|png)$/i.test(file.name);
+    if(!isImage){
+      if(errEl) errEl.textContent='Invalid image format. Only JPEG and PNG images (.jpg, .jpeg, .png) are supported for author pictures.';
+      authorImageInput.value='';
+      authorImagePreview.classList.add('hidden');
+      authorImagePreview.innerHTML='';
+      return;
+    }
+
+    const MAX_AUTHOR_BYTES=200*1024;
+    if(file.size>MAX_AUTHOR_BYTES){
+      const sizeKb=(file.size/1024).toFixed(1);
+      if(errEl) errEl.textContent=`Author picture size is ${sizeKb} KB. Author picture must be under 200 KB.`;
+      authorImageInput.value='';
+      authorImagePreview.classList.add('hidden');
+      authorImagePreview.innerHTML='';
+      return;
+    }
+
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      const dataUrl=e.target.result;
+      const img=new Image();
+      img.onload=()=>{
+        const sizeKb=(file.size/1024).toFixed(1);
+        authorImagePreview.innerHTML=`
+          <div class="preview-section">
+            <span class="kicker">Author Picture Preview (${sizeKb} KB)</span>
+            <div class="author-preview-card">
+              <div class="author-preview-avatar" style="background-image:url('${dataUrl}')"></div>
+              <div class="author-preview-details">
+                <strong>${esc(file.name)}</strong>
+                <small>${img.naturalWidth} × ${img.naturalHeight}px · ${sizeKb} KB (under 200 KB limit)</small>
+              </div>
+              <button type="button" class="author-remove-btn" id="removeAuthorImageBtn">Remove ×</button>
+            </div>
+          </div>
+        `;
+        authorImagePreview.classList.remove('hidden');
+
+        const removeBtn=authorImagePreview.querySelector('#removeAuthorImageBtn');
+        if(removeBtn){
+          removeBtn.addEventListener('click',()=>{
+            authorImageInput.value='';
+            authorImagePreview.innerHTML='';
+            authorImagePreview.classList.add('hidden');
+          });
+        }
+      };
+      img.src=dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 if(thumbnailInput && thumbnailPreview){
   thumbnailInput.addEventListener('change',()=>{
@@ -354,14 +474,39 @@ uploadForm.addEventListener('submit',async e=>{
   const succEl=document.querySelector('#uploadSuccess');
   errEl.textContent='';
   succEl.textContent='';
+
+  if(authorBioInput){
+    const bioWords=countWords(authorBioInput.value);
+    if(bioWords>200){
+      errEl.textContent=`Author bio exceeds the 200-word limit (${bioWords} words).`;
+      return;
+    }
+  }
+
+  if(docPreviewText && docPreviewText.value){
+    const previewWords=countWords(docPreviewText.value);
+    if(previewWords>6000){
+      errEl.textContent=`Document text exceeds the 6,000-word limit (${previewWords.toLocaleString()} words).`;
+      return;
+    }
+  }
+
   isPublishing=true;
   if(submitBtn){submitBtn.disabled=true;submitBtn.style.opacity='0.6';submitBtn.innerHTML='Publishing to journal… <span>⏳</span>';}
   try{
     const result=await api('/api/admin/vlogs',{method:'POST',body:new FormData(uploadForm)});
     succEl.textContent='Published successfully — '+result.word_count+' words'+(result.thumbnail_filename?' with custom thumbnail.':'.');
     uploadForm.reset();
-    previewEl.innerHTML='';
-    previewEl.classList.add('hidden');
+    if(docPreviewContainer){
+      docPreviewContainer.classList.add('hidden');
+      if(docPreviewText) docPreviewText.value='';
+      if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+    }
+    if(authorBioWordCount) authorBioWordCount.textContent='0 / 200 words';
+    if(authorImagePreview){
+      authorImagePreview.innerHTML='';
+      authorImagePreview.classList.add('hidden');
+    }
     if(thumbnailPreview){
       thumbnailPreview.innerHTML='';
       thumbnailPreview.classList.add('hidden');
@@ -385,7 +530,7 @@ async function loadArchive(isPoll=false){
 
     document.querySelector('#vlogCount').textContent=items.length;
     const list=document.querySelector('#recentList');
-    list.innerHTML=items.length?items.map(v=>`<div class="recent-item"><strong>${esc(v.title)}</strong><small>${esc(v.category)} · ${esc(v.author)} · ${v.word_count} words${v.thumbnail_filename?' · 🖼️ Custom JPEG':''}</small><button class="delete-btn" data-id="${v.id}" title="Delete vlog">×</button></div>`).join(''):'<p class="muted">No uploaded films yet.</p>';
+    list.innerHTML=items.length?items.map(v=>`<div class="recent-item"><strong>${esc(v.title)}</strong><small>${esc(v.category)} · ${esc(v.author)} · ${v.word_count} words${v.thumbnail_filename?' · 🖼️ Custom JPEG':''}${v.author_image_filename?' · 👤 Author Picture':''}</small><button class="delete-btn" data-id="${v.id}" title="Delete vlog">×</button></div>`).join(''):'<p class="muted">No uploaded films yet.</p>';
     document.querySelectorAll('.delete-btn').forEach(btn=>btn.addEventListener('click',async()=>{
       if(!confirm('Delete this vlog? This cannot be undone.'))return;
       try{await api(`/api/admin/vlogs/${btn.dataset.id}`,{method:'DELETE'});loadArchive(false);}catch(err){alert(err.message);}

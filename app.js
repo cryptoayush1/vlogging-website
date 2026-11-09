@@ -109,7 +109,9 @@ async function loadPublishedVlogs(){
       length: `${v.word_count} words`,
       style: styles[i % styles.length],
       body_text: v.body_text || '',
-      thumbnail_filename: v.thumbnail_filename || ''
+      thumbnail_filename: v.thumbnail_filename || '',
+      author_image_filename: v.author_image_filename || '',
+      author_bio: v.author_bio || ''
     }));
 
     vlogs = customList;
@@ -223,6 +225,22 @@ function openVlog(v){
     bodyEl.innerHTML = v.body_text.split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('');
   } else {
     bodyEl.innerHTML = '<p class="muted">Full text not available.</p>';
+  }
+
+  const authorCard = document.querySelector('#readerAuthorCard');
+  const authorAvatar = document.querySelector('#readerAuthorAvatar');
+  const authorName = document.querySelector('#readerAuthorName');
+  const authorBio = document.querySelector('#readerAuthorBio');
+  if (authorCard && authorName && authorBio && authorAvatar) {
+    authorName.textContent = v.author || 'Field Notes Author';
+    authorBio.textContent = v.author_bio || 'Contributor to the Field Notes journal archive.';
+    if (v.author_image_filename) {
+      authorAvatar.textContent = '';
+      authorAvatar.style.backgroundImage = `url('/uploads/${encodeURIComponent(v.author_image_filename)}')`;
+    } else {
+      authorAvatar.style.backgroundImage = '';
+      authorAvatar.textContent = (v.author || 'F').charAt(0).toUpperCase();
+    }
   }
 
   const successEl = document.querySelector('#feedbackSuccess');
