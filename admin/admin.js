@@ -438,7 +438,31 @@ async function loadUsers(){
   }));
 }
 
-document.querySelector('#registerButton').addEventListener('click',()=>{loginView.classList.add('hidden');document.querySelector('#registerView').classList.remove('hidden');});
+async function checkSetupStatus(){
+  try{
+    const res=await api('/api/admin/setup-status');
+    const roleSelect=document.querySelector('#roleSelect');
+    const optAdmin=document.querySelector('#optAdmin');
+    const optCoadmin=document.querySelector('#optCoadmin');
+    const registerMuted=document.querySelector('#registerMuted');
+    if(res && res.has_admin){
+      if(optAdmin){ optAdmin.disabled=true; optAdmin.style.display='none'; }
+      if(optCoadmin){ optCoadmin.selected=true; }
+      if(roleSelect){ roleSelect.value='coadmin'; }
+      if(registerMuted){ registerMuted.textContent='An administrator is already registered. You are creating a Co-admin account.'; }
+    }else{
+      if(optAdmin){ optAdmin.disabled=false; optAdmin.style.display=''; optAdmin.selected=true; }
+      if(roleSelect){ roleSelect.value='admin'; }
+      if(registerMuted){ registerMuted.textContent='Initial setup: Creating the Primary Administrator account.'; }
+    }
+  }catch(err){}
+}
+
+document.querySelector('#registerButton').addEventListener('click',()=>{
+  checkSetupStatus();
+  loginView.classList.add('hidden');
+  document.querySelector('#registerView').classList.remove('hidden');
+});
 document.querySelector('#backToLogin').addEventListener('click',()=>{document.querySelector('#registerView').classList.add('hidden');loginView.classList.remove('hidden');});
 document.querySelector('#registerForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -451,7 +475,9 @@ document.querySelector('#registerForm').addEventListener('submit',async e=>{
     e.target.reset();
     document.querySelector('#registerView').classList.add('hidden');
     loginView.classList.remove('hidden');
+    checkSetupStatus();
   }catch(err){error.textContent=err.message;}
 });
 
 checkSession();
+checkSetupStatus();

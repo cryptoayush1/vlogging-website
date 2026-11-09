@@ -348,6 +348,10 @@ def verify_password(password: str, encoded: str) -> bool:
 
 def validate_registration(conn, username, email, password, repeat_password, role):
     if role not in ('admin', 'coadmin'): raise ValueError('Invalid account role.')
+    if role == 'admin':
+        admin_count = conn.execute('SELECT COUNT(*) FROM users WHERE role="admin"').fetchone()[0]
+        if admin_count >= 1:
+            raise ValueError('An administrator account already exists. Only co-admin accounts can be registered.')
     if not re.fullmatch(r'[A-Za-z0-9_.-]{3,40}', username or ''): raise ValueError('Username must be 3-40 letters, numbers, dots, dashes, or underscores.')
     if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email or ''): raise ValueError('Enter a valid Gmail or email address.')
     if not password or len(password) < 8: raise ValueError('Password must be at least 8 characters.')
@@ -357,6 +361,10 @@ def validate_registration(conn, username, email, password, repeat_password, role
 
 def create_user(conn, username: str, password: str, role: str = 'coadmin', email: str = '') -> int:
     if role not in {'admin', 'coadmin'}: raise ValueError('Role must be admin or coadmin.')
+    if role == 'admin':
+        admin_count = conn.execute('SELECT COUNT(*) FROM users WHERE role="admin"').fetchone()[0]
+        if admin_count >= 1:
+            raise ValueError('An administrator account already exists. Only co-admin accounts can be registered.')
     if len(username.strip()) < 3 or len(password) < 8: raise ValueError('Username must have 3 characters and password 8 characters.')
     cursor = conn.execute('INSERT INTO users(username,email,password_hash,role) VALUES(?,?,?,?)', (username.strip(), email.strip().lower() or f'{username.strip()}@local.invalid', password_hash(password), role)); conn.commit(); return cursor.lastrowid
 
@@ -560,6 +568,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Location', '/admin/')
             self.end_headers()
             return
+        if parsed.path == '/api/admin/setup-status':
+            with db() as conn:
+                has_admin = bool(conn.execute('SELECT 1 FROM users WHERE role="admin" LIMIT 1').fetchone())
+            return self.send_json(200, {'has_admin': has_admin})
         if parsed.path == '/api/vlogs':
             with db() as conn: rows = [dict(row) for row in conn.execute('SELECT * FROM vlogs ORDER BY created_at DESC')]
             return self.send_json(200, rows)
