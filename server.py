@@ -60,6 +60,9 @@ def load_dotenv():
 
 load_dotenv()
 
+TURSO_DATABASE_URL = os.getenv('TURSO_DATABASE_URL', '').strip()
+TURSO_AUTH_TOKEN = os.getenv('TURSO_AUTH_TOKEN', '').strip()
+
 SMTP_USER = os.getenv('SMTP_USER', 'vlogingwebsite@gmail.com')
 SMTP_PASS = os.getenv('SMTP_PASS', 'uxendqgrtentfkzh').replace(' ', '')
 SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
@@ -498,15 +501,150 @@ def word_count(data: bytes, filename: str) -> int:
     return len(re.findall(r"[A-Za-z0-9’'-]+", text))
 
 
+def to_turso_arg(val):
+    if val is None:
+        return {'type': 'null'}
+    elif isinstance(val, bool):
+        return {'type': 'integer', 'value': '1' if val else '0'}
+    elif isinstance(val, int):
+        return {'type': 'integer', 'value': str(val)}
+    elif isinstance(val, float):
+        return {'type': 'float', 'value': val}
+    elif isinstance(val, (bytes, bytearray)):
+        return {'type': 'blob', 'base64': base64.b64encode(val).decode()}
+    else:
+        return {'type': 'text', 'value': str(val)}
+
+
+def from_turso_value(cell):
+    t = cell.get('type')
+    val = cell.get('value')
+    if t == 'null': return None
+    elif t == 'integer': return int(val)
+    elif t == 'float': return float(val)
+    elif t == 'text': return str(val)
+    elif t == 'blob':
+        return base64.b64decode(cell.get('base64', ''))
+    return val
+
+
+class TursoRow(dict):
+    def __init__(self, cols, values):
+        super().__init__(zip(cols, values))
+        self._values = list(values)
+        self._cols = list(cols)
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._values[item]
+        return super().__getitem__(item)
+
+    def keys(self):
+        return self._cols
+
+
+class TursoCursor:
+    def __init__(self, cols, rows, last_id=None, affected=0):
+        self.cols = cols
+        self._rows = [TursoRow(cols, r) for r in rows]
+        self._idx = 0
+        self.lastrowid = int(last_id) if last_id is not None else None
+        self.rowcount = affected
+
+    def fetchone(self):
+        if self._idx < len(self._rows):
+            r = self._rows[self._idx]
+            self._idx += 1
+            return r
+        return None
+
+    def fetchall(self):
+        rem = self._rows[self._idx:]
+        self._idx = len(self._rows)
+        return rem
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+
+class TursoConnection:
+    def __init__(self, url, token):
+        u = url.strip()
+        if u.startswith('libsql://'):
+            u = 'https://' + u[len('libsql://'):]
+        if not u.endswith('/v2/pipeline'):
+            u = u.rstrip('/') + '/v2/pipeline'
+        self.url = u
+        self.token = token.strip()
+
+    def execute(self, sql, params=()):
+        if params is None:
+            params = ()
+        elif not isinstance(params, (list, tuple)):
+            params = (params,)
+        args = [to_turso_arg(p) for p in params]
+        payload = {
+            'requests': [
+                {'type': 'execute', 'stmt': {'sql': sql, 'args': args}},
+                {'type': 'close'}
+            ]
+        }
+        req = urllib.request.Request(
+            self.url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            raise sqlite3.OperationalError(f'Turso query error: {e}')
+
+        first = body.get('results', [{}])[0]
+        if first.get('type') == 'error':
+            msg = first.get('error', {}).get('message', 'Turso error')
+            if 'UNIQUE constraint failed' in msg:
+                raise sqlite3.IntegrityError(msg)
+            raise sqlite3.OperationalError(msg)
+        exec_res = first.get('response', {}).get('result', {})
+        cols = [c['name'] for c in exec_res.get('cols', [])]
+        rows = [[from_turso_value(cell) for cell in r] for r in exec_res.get('rows', [])]
+        return TursoCursor(cols, rows, exec_res.get('last_insert_rowid'), exec_res.get('affected_row_count', 0))
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 def db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = None
+    if TURSO_DATABASE_URL and TURSO_AUTH_TOKEN:
+        try:
+            candidate = TursoConnection(TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
+            candidate.execute('SELECT 1')
+            conn = candidate
+        except Exception as e:
+            conn = None
+
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+
     conn.execute('''CREATE TABLE IF NOT EXISTS vlogs (
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL,
     author TEXT NOT NULL, excerpt TEXT NOT NULL, filename TEXT NOT NULL,
-    word_count INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, user_id INTEGER REFERENCES users(id),
+    word_count INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, user_id INTEGER,
     body_text TEXT DEFAULT '', thumbnail_filename TEXT DEFAULT '',
-    author_image_filename TEXT DEFAULT '', author_bio TEXT DEFAULT '')''')
+    author_image_filename TEXT DEFAULT '', author_bio TEXT DEFAULT '',
+    thumbnail_data TEXT DEFAULT '', author_image_data TEXT DEFAULT '')''')
     # Add columns if missing (migration)
     cols = [row['name'] for row in conn.execute("PRAGMA table_info(vlogs)")]
     if 'user_id' not in cols:
@@ -519,6 +657,10 @@ def db():
         conn.execute('ALTER TABLE vlogs ADD COLUMN author_image_filename TEXT DEFAULT ""')
     if 'author_bio' not in cols:
         conn.execute('ALTER TABLE vlogs ADD COLUMN author_bio TEXT DEFAULT ""')
+    if 'thumbnail_data' not in cols:
+        conn.execute('ALTER TABLE vlogs ADD COLUMN thumbnail_data TEXT DEFAULT ""')
+    if 'author_image_data' not in cols:
+        conn.execute('ALTER TABLE vlogs ADD COLUMN author_image_data TEXT DEFAULT ""')
     init_db(conn)
     ensure_admin(conn)
     conn.commit()
@@ -668,6 +810,24 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path.startswith('/uploads/'): 
             filename = Path(parsed.path.removeprefix('/uploads/')).name
             path = UPLOAD_DIR / filename
+            if not path.is_file():
+                try:
+                    with db() as conn:
+                        row = conn.execute(
+                            'SELECT thumbnail_filename, thumbnail_data, author_image_filename, author_image_data FROM vlogs WHERE thumbnail_filename=? OR author_image_filename=? LIMIT 1',
+                            (filename, filename)
+                        ).fetchone()
+                        if row:
+                            data_b64 = ''
+                            if row['thumbnail_filename'] == filename:
+                                data_b64 = row['thumbnail_data']
+                            elif row['author_image_filename'] == filename:
+                                data_b64 = row['author_image_data']
+                            if data_b64:
+                                UPLOAD_DIR.mkdir(exist_ok=True)
+                                path.write_bytes(base64.b64decode(data_b64))
+                except Exception:
+                    pass
             if not path.is_file(): return self.send_json(404, {'error': 'Not found.'})
             data = path.read_bytes()
             ext = path.suffix.lower()
@@ -934,11 +1094,14 @@ class Handler(BaseHTTPRequestHandler):
                     safe_author_img_name = 'author_' + secrets.token_hex(8) + ext
                     (UPLOAD_DIR / safe_author_img_name).write_bytes(author_img_data)
 
+                safe_thumb_b64 = base64.b64encode(thumb_data).decode() if thumb_data else ''
+                safe_author_b64 = base64.b64encode(author_img_data).decode() if author_img_data else ''
+
                 user = self.authenticated()
                 with db() as conn:
                     cursor = conn.execute(
-                        'INSERT INTO vlogs(title,category,author,excerpt,filename,word_count,user_id,body_text,thumbnail_filename,author_image_filename,author_bio) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-                        (title, category, author, excerpt, safe_name, final_word_count, user['id'], final_body, safe_thumb_name, safe_author_img_name, author_bio)
+                        'INSERT INTO vlogs(title,category,author,excerpt,filename,word_count,user_id,body_text,thumbnail_filename,author_image_filename,author_bio,thumbnail_data,author_image_data) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                        (title, category, author, excerpt, safe_name, final_word_count, user['id'], final_body, safe_thumb_name, safe_author_img_name, author_bio, safe_thumb_b64, safe_author_b64)
                     )
                     vlog_id = cursor.lastrowid
                 return self.send_json(201, {
