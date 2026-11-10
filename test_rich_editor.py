@@ -95,6 +95,10 @@ class RichEditorTests(unittest.TestCase):
         self.assertIn('btnPicReplace', admin_js)
         self.assertIn('btnPicDelete', admin_js)
         self.assertIn('imgResizeOverlay', admin_js)
+        self.assertIn('makeImagesDraggable', admin_js)
+        self.assertIn('btnPicMoveUp', admin_js)
+        self.assertIn('btnPicMoveDown', admin_js)
+        self.assertIn('editorDropLine', admin_js)
 
     def test_server_has_body_image_upload_endpoint(self):
         server_code = (ROOT / 'server.py').read_text(encoding='utf-8')

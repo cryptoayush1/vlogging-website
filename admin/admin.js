@@ -607,6 +607,13 @@ function syncVisualToText(){
   updateDocPreviewWordCount();
 }
 
+function makeImagesDraggable(){
+  if(!docPreviewVisual) return;
+  docPreviewVisual.querySelectorAll('img, figure').forEach(el => {
+    el.setAttribute('draggable', 'true');
+  });
+}
+
 function setPreviewContent(content){
   deselectEditorImage();
   if(!content){
@@ -625,6 +632,7 @@ function setPreviewContent(content){
     if(docPreviewVisual) docPreviewVisual.innerHTML = content;
     if(docPreviewText) docPreviewText.value = content;
   }
+  makeImagesDraggable();
   updateDocPreviewWordCount();
 }
 
@@ -746,13 +754,14 @@ if(btnInsertPhoto && editorImageInput){
           ? `<figcaption style="font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;">${esc(photoCaption.trim())}</figcaption>`
           : '';
         const figureHtml = `
-          <figure style="margin:20px 0;text-align:center;">
-            <img src="${finalImgUrl}" alt="${esc(photoCaption || 'Vlog photo')}" style="max-width:100%;height:auto;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.08);display:block;margin:0 auto;" />
+          <figure draggable="true" style="margin:20px 0;text-align:center;">
+            <img draggable="true" src="${finalImgUrl}" alt="${esc(photoCaption || 'Vlog photo')}" style="max-width:100%;height:auto;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.08);display:block;margin:0 auto;" />
             ${captionHtml}
           </figure>
           <p><br></p>
         `;
         document.execCommand('insertHTML', false, figureHtml);
+        makeImagesDraggable();
         syncVisualToText();
       }
     } catch(err) {
@@ -777,12 +786,37 @@ const btnPicCaption = document.querySelector('#btnPicCaption');
 const btnPicReplace = document.querySelector('#btnPicReplace');
 const btnPicDelete = document.querySelector('#btnPicDelete');
 const btnPicDone = document.querySelector('#btnPicDone');
+const btnPicMoveUp = document.querySelector('#btnPicMoveUp');
+const btnPicMoveDown = document.querySelector('#btnPicMoveDown');
+const overlayMovePill = document.querySelector('#overlayMovePill');
+const editorDropLine = document.querySelector('#editorDropLine');
 const replaceImageInput = document.querySelector('#replaceImageInput');
 const imgResizeOverlay = document.querySelector('#imgResizeOverlay');
 const resizeDimBadge = document.querySelector('#resizeDimBadge');
 
 let activeSelectedImg = null;
 let isDraggingResize = false;
+let draggedItem = null;
+
+function showDropLineAt(range) {
+  if (!editorDropLine || !docPreviewVisual) return;
+  const containerRect = docPreviewVisual.parentElement.getBoundingClientRect();
+  let block = range.startContainer;
+  if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+  if (!block || !docPreviewVisual.contains(block)) return;
+
+  const blockRect = block.getBoundingClientRect();
+  const top = (blockRect.top - containerRect.top) + (range.startOffset > 0 ? blockRect.height : 0) + docPreviewVisual.parentElement.scrollTop;
+
+  editorDropLine.style.top = `${Math.max(0, top)}px`;
+  editorDropLine.style.left = `16px`;
+  editorDropLine.style.width = `${Math.max(120, docPreviewVisual.clientWidth - 32)}px`;
+  editorDropLine.classList.remove('hidden');
+}
+
+function hideDropLine() {
+  if (editorDropLine) editorDropLine.classList.add('hidden');
+}
 
 function positionImageOverlay(img) {
   if (!img || !imgResizeOverlay || !docPreviewVisual) return;
@@ -837,6 +871,55 @@ function deselectEditorImage() {
   document.querySelectorAll('[data-img-wrap]').forEach(b => b.classList.remove('is-active'));
 }
 
+// Move photo position Up before previous block
+if (btnPicMoveUp) {
+  btnPicMoveUp.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    const target = activeSelectedImg.closest('figure') || activeSelectedImg;
+    const prev = target.previousElementSibling;
+    if (prev) {
+      target.parentElement.insertBefore(target, prev);
+      positionImageOverlay(activeSelectedImg);
+      syncVisualToText();
+    }
+  });
+}
+
+// Move photo position Down after next block
+if (btnPicMoveDown) {
+  btnPicMoveDown.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    const target = activeSelectedImg.closest('figure') || activeSelectedImg;
+    const next = target.nextElementSibling;
+    if (next) {
+      target.parentElement.insertBefore(target, next.nextElementSibling);
+      positionImageOverlay(activeSelectedImg);
+      syncVisualToText();
+    }
+  });
+}
+
+// Move pill on the selection overlay (drag to move)
+if (overlayMovePill) {
+  overlayMovePill.addEventListener('dragstart', (e) => {
+    if (!activeSelectedImg) return;
+    const target = activeSelectedImg.closest('figure') || activeSelectedImg;
+    draggedItem = target;
+    draggedItem.classList.add('is-dragging');
+    imgResizeOverlay.classList.add('hidden');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'vlog-image-move');
+
+    if (e.dataTransfer.setDragImage && activeSelectedImg) {
+      try {
+        e.dataTransfer.setDragImage(activeSelectedImg, 40, 40);
+      } catch(err) {}
+    }
+  });
+}
+
 if (docPreviewVisual) {
   docPreviewVisual.addEventListener('click', (e) => {
     const img = e.target.closest('img');
@@ -850,6 +933,120 @@ if (docPreviewVisual) {
 
   docPreviewVisual.addEventListener('scroll', () => {
     if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
+  });
+
+  // DRAG & DROP REPOSITIONING (Moves picture to where the cursor is)
+  docPreviewVisual.addEventListener('dragstart', (e) => {
+    const target = e.target.closest('figure') || (e.target.tagName === 'IMG' ? e.target : null);
+    if (!target) return;
+
+    draggedItem = target;
+    draggedItem.classList.add('is-dragging');
+    if (imgResizeOverlay) imgResizeOverlay.classList.add('hidden');
+
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'vlog-image-move');
+
+    const img = target.querySelector('img') || (target.tagName === 'IMG' ? target : null);
+    if (img && e.dataTransfer.setDragImage) {
+      try {
+        e.dataTransfer.setDragImage(img, Math.min(img.clientWidth / 2, 80), Math.min(img.clientHeight / 2, 80));
+      } catch(err) {}
+    }
+  });
+
+  docPreviewVisual.addEventListener('dragover', (e) => {
+    if (!draggedItem) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    let range = null;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+
+    if (range && docPreviewVisual.contains(range.startContainer)) {
+      showDropLineAt(range);
+    }
+  });
+
+  docPreviewVisual.addEventListener('dragleave', (e) => {
+    if (!docPreviewVisual.contains(e.relatedTarget)) {
+      hideDropLine();
+    }
+  });
+
+  docPreviewVisual.addEventListener('dragend', () => {
+    if (draggedItem) {
+      draggedItem.classList.remove('is-dragging');
+      draggedItem = null;
+    }
+    hideDropLine();
+  });
+
+  docPreviewVisual.addEventListener('drop', (e) => {
+    if (!draggedItem) return;
+    e.preventDefault();
+    e.stopPropagation();
+    hideDropLine();
+
+    let range = null;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+
+    if (range && docPreviewVisual.contains(range.startContainer)) {
+      if (!draggedItem.contains(range.startContainer)) {
+        let node = range.startContainer;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const parentP = node.closest('p, blockquote, div') || node.parentElement;
+          if (parentP && parentP !== docPreviewVisual) {
+            if (range.startOffset < (node.length / 2)) {
+              parentP.parentElement.insertBefore(draggedItem, parentP);
+            } else {
+              parentP.parentElement.insertBefore(draggedItem, parentP.nextSibling);
+            }
+          } else {
+            range.insertNode(draggedItem);
+          }
+        } else {
+          if (node === docPreviewVisual) {
+            if (range.startOffset < node.childNodes.length) {
+              node.insertBefore(draggedItem, node.childNodes[range.startOffset]);
+            } else {
+              node.appendChild(draggedItem);
+            }
+          } else {
+            const block = node.closest('p, blockquote, h1, h2, h3, div') || node;
+            block.parentElement.insertBefore(draggedItem, block.nextSibling);
+          }
+        }
+      }
+    }
+
+    const img = draggedItem.querySelector('img') || (draggedItem.tagName === 'IMG' ? draggedItem : null);
+    draggedItem.classList.remove('is-dragging');
+    draggedItem = null;
+
+    makeImagesDraggable();
+    if (img) {
+      selectEditorImage(img);
+    }
+    syncVisualToText();
   });
 }
 

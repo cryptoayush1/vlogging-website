@@ -181,6 +181,8 @@
 
                   <!-- Caption & Operations -->
                   <div class="picture-tool-group">
+                    <button type="button" class="pic-tool-btn" id="btnPicMoveUp" title="Move photo up before previous paragraph">⬆ Move Up</button>
+                    <button type="button" class="pic-tool-btn" id="btnPicMoveDown" title="Move photo down after next paragraph">⬇ Move Down</button>
                     <button type="button" class="pic-tool-btn" id="btnPicCaption" title="Edit or add image caption">✎ Caption</button>
                     <button type="button" class="pic-tool-btn" id="btnPicReplace" title="Replace picture with another file">🔄 Replace</button>
                     <button type="button" class="pic-tool-btn pic-delete-btn" id="btnPicDelete" title="Delete this image">🗑️ Delete</button>
@@ -196,8 +198,13 @@
                        placeholder="Document preview will appear here once selected. You can format text, add bullets, align paragraphs, and insert photos."
                        style="resize:both;min-height:160px;min-width:200px;max-width:100%;line-height:1.75;outline:none;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;padding:14px 16px;overflow-y:auto;font-family:inherit;">
                   </div>
+                  <!-- Drop Position Line Indicator (shows where dragged photo will land) -->
+                  <div id="editorDropLine" class="editor-drop-line hidden"></div>
                   <!-- Floating Image Resize Handles Overlay (Outside contenteditable to prevent DOM pollution) -->
                   <div id="imgResizeOverlay" class="img-resize-overlay hidden" style="position:absolute;pointer-events:none;border:2px solid #5c751f;box-sizing:border-box;z-index:100;">
+                    <div class="resize-move-pill" id="overlayMovePill" title="Drag to move photo to any position" draggable="true" style="pointer-events:auto;cursor:move;">
+                      ✥ Drag with cursor to move
+                    </div>
                     <div class="resize-handle handle-nw" data-handle="nw" style="pointer-events:auto;"></div>
                     <div class="resize-handle handle-ne" data-handle="ne" style="pointer-events:auto;"></div>
                     <div class="resize-handle handle-se" data-handle="se" style="pointer-events:auto;"></div>
