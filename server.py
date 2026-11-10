@@ -1303,6 +1303,29 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, {'body_text': body_text, 'word_count': count})
             except ValueError as error: return self.send_json(400, {'error': str(error)})
             except Exception as error: return self.send_json(500, {'error': 'Preview failed. Please try again.'})
+        if parsed.path == '/api/admin/vlogs/upload-body-image' and self.command == 'POST':
+            if not self.authenticated(): return self.send_json(401, {'error': 'Admin authentication required.'})
+            try:
+                body = self.read_body()
+                parts = parse_multipart(body, self.headers.get('Content-Type', ''))
+                file = parts.get('image', {})
+                filename = file.get('filename') or ''
+                data = file.get('data', b'')
+                if not data: raise ValueError('Please select an image file to upload.')
+                suffix = Path(filename).suffix.lower()
+                if suffix not in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
+                    raise ValueError('Supported image formats: JPEG, PNG, WebP, GIF.')
+                if len(data) > 5 * 1024 * 1024:
+                    raise ValueError('Image size exceeds the 5 MB limit.')
+                safe_name = 'body_' + secrets.token_hex(8) + suffix
+                UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                (UPLOAD_DIR / safe_name).write_bytes(data)
+                return self.send_json(200, {
+                    'url': f'/uploads/{safe_name}',
+                    'filename': safe_name
+                })
+            except ValueError as error: return self.send_json(400, {'error': str(error)})
+            except Exception as error: return self.send_json(500, {'error': 'Failed to upload photo. Please try again.'})
         if parsed.path == '/api/admin/vlogs' and self.command == 'POST':
             if not self.authenticated(): return self.send_json(401, {'error': 'Admin authentication required.'})
             try:

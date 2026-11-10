@@ -1,4 +1,5 @@
 .env
+*.db
 field_notes.db
 journal.db
 uploads/

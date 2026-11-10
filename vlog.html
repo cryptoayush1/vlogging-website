@@ -7,7 +7,7 @@
   <title id="pageTitle">Field Notes — Reading Journal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Hind+Siliguri:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <style>
     /* Dedicated Full-Page Article View — Original Field Notes Palette */
@@ -372,18 +372,71 @@
       font-size: 19px;
       line-height: 1.88;
       color: #2b2e27;
+      word-break: break-word;
     }
     .formatted-article-body p {
       margin-bottom: 1.5em;
     }
     .formatted-article-body p:first-of-type::first-letter {
-      font-size: 64px;
+      font-size: 54px;
       line-height: 0.85;
       float: left;
       margin: 8px 14px 0 0;
       color: var(--ink);
       font-family: var(--serif);
       font-weight: 700;
+    }
+    .formatted-article-body[lang="bn"] p:first-of-type::first-letter,
+    .formatted-article-body [style*="Hind Siliguri"] p:first-of-type::first-letter,
+    .formatted-article-body font[face*="Hind Siliguri"] {
+      font-family: 'Hind Siliguri', sans-serif !important;
+    }
+    .formatted-article-body a {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-color: var(--lime);
+      text-underline-offset: 3px;
+      font-weight: 500;
+      transition: color 0.15s ease;
+    }
+    .formatted-article-body a:hover {
+      color: #000;
+      text-decoration-color: var(--ink);
+    }
+    .formatted-article-body u {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .formatted-article-body ul, 
+    .formatted-article-body ol {
+      margin: 1.5em 0;
+      padding-left: 32px;
+    }
+    .formatted-article-body li {
+      margin-bottom: 0.6em;
+      line-height: 1.75;
+    }
+    .formatted-article-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+      margin: 24px auto;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+    }
+    .formatted-article-body figure {
+      margin: 28px 0;
+      text-align: center;
+    }
+    .formatted-article-body figure img {
+      margin: 0 auto;
+    }
+    .formatted-article-body figcaption {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+      font-style: italic;
+      font-family: var(--sans);
     }
     .formatted-article-body blockquote {
       border-left: 2px solid var(--lime);
@@ -393,9 +446,9 @@
       color: #454940;
       background: var(--paper);
     }
-    .formatted-article-body h2, .formatted-article-body h3 {
+    .formatted-article-body h2, .formatted-article-body h3, .formatted-article-body h4 {
       font-family: var(--serif);
-      font-weight: 400;
+      font-weight: 700;
       color: var(--ink);
       margin: 2em 0 0.8em;
       line-height: 1.25;

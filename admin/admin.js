@@ -586,16 +586,57 @@ const authorBioInput=uploadForm.querySelector('#authorBioInput');
 const authorBioWordCount=document.querySelector('#authorBioWordCount');
 const docPreviewContainer=document.querySelector('#docPreviewContainer');
 const docPreviewText=document.querySelector('#docPreviewText');
+const docPreviewVisual=document.querySelector('#docPreviewVisual');
 const docPreviewWordCount=document.querySelector('#docPreviewWordCount');
+const editorFontFamily=document.querySelector('#editorFontFamily');
+const editorFontSize=document.querySelector('#editorFontSize');
+const editorImageInput=document.querySelector('#editorImageInput');
+const btnInsertPhoto=document.querySelector('#btnInsertPhoto');
+const btnToggleSource=document.querySelector('#btnToggleSource');
+let isSourceView=false;
 
 function countWords(str){
   if(!str||!str.trim()) return 0;
-  return str.trim().split(/\s+/).length;
+  // Clean out HTML tags for accurate word counting
+  const plain = str.replace(/<[^>]+>/g, ' ').trim();
+  if(!plain) return 0;
+  return plain.split(/\s+/).filter(Boolean).length;
+}
+
+function syncVisualToText(){
+  if(!docPreviewVisual || !docPreviewText) return;
+  if(!isSourceView){
+    docPreviewText.value = docPreviewVisual.innerHTML;
+  } else {
+    docPreviewVisual.innerHTML = docPreviewText.value;
+  }
+  updateDocPreviewWordCount();
+}
+
+function setPreviewContent(content){
+  if(!content){
+    if(docPreviewVisual) docPreviewVisual.innerHTML='';
+    if(docPreviewText) docPreviewText.value='';
+    updateDocPreviewWordCount();
+    return;
+  }
+  // Check if content is HTML or plain text
+  if(!/<[a-z][\s\S]*>/i.test(content)){
+    const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split(/\n+/).filter(Boolean);
+    const html = lines.map(l => `<p>${esc(l)}</p>`).join('');
+    if(docPreviewVisual) docPreviewVisual.innerHTML = html;
+    if(docPreviewText) docPreviewText.value = html;
+  } else {
+    if(docPreviewVisual) docPreviewVisual.innerHTML = content;
+    if(docPreviewText) docPreviewText.value = content;
+  }
+  updateDocPreviewWordCount();
 }
 
 function updateDocPreviewWordCount(){
-  if(!docPreviewText||!docPreviewWordCount) return;
-  const count=countWords(docPreviewText.value);
+  if(!docPreviewWordCount) return;
+  const raw = docPreviewVisual ? (docPreviewVisual.innerText || docPreviewVisual.textContent || '') : (docPreviewText ? docPreviewText.value : '');
+  const count=countWords(raw);
   docPreviewWordCount.textContent=`${count.toLocaleString()} / 6,000 words`;
   if(count>6000){
     docPreviewWordCount.style.color='#b43434';
@@ -604,8 +645,178 @@ function updateDocPreviewWordCount(){
   }
 }
 
+if(docPreviewVisual){
+  docPreviewVisual.addEventListener('input', syncVisualToText);
+  docPreviewVisual.addEventListener('blur', syncVisualToText);
+}
 if(docPreviewText){
-  docPreviewText.addEventListener('input',updateDocPreviewWordCount);
+  docPreviewText.addEventListener('input', ()=>{
+    if(isSourceView && docPreviewVisual){
+      docPreviewVisual.innerHTML = docPreviewText.value;
+    }
+    updateDocPreviewWordCount();
+  });
+}
+
+// Formatting Toolbar Action Handlers (Bold, Italics, Underline, Justification, Lists)
+document.querySelectorAll('.editor-tool-btn[data-cmd]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if(isSourceView){
+      alert('Please switch back to Visual mode to apply rich formatting.');
+      return;
+    }
+    if(!docPreviewVisual) return;
+    docPreviewVisual.focus();
+    const cmd = btn.dataset.cmd;
+    document.execCommand(cmd, false, null);
+    syncVisualToText();
+  });
+});
+
+// Hyperlink Handler
+const btnLink = document.querySelector('#btnLink');
+if(btnLink){
+  btnLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    if(isSourceView){
+      alert('Please switch back to Visual mode to apply links.');
+      return;
+    }
+    if(!docPreviewVisual) return;
+    docPreviewVisual.focus();
+    const url = prompt('Enter link destination URL (e.g. https://example.com):', 'https://');
+    if(!url || !url.trim()) return;
+    const cleanUrl = url.trim();
+    document.execCommand('createLink', false, cleanUrl);
+    syncVisualToText();
+  });
+}
+
+// Font Size Handler
+if(editorFontSize){
+  editorFontSize.addEventListener('change', () => {
+    if(isSourceView) return;
+    const size = editorFontSize.value;
+    if(!size || !docPreviewVisual) return;
+    docPreviewVisual.focus();
+    document.execCommand('fontSize', false, size);
+    syncVisualToText();
+  });
+}
+
+// Bengali / English Font Selector
+if(editorFontFamily){
+  editorFontFamily.addEventListener('change', () => {
+    const font = editorFontFamily.value;
+    if(!docPreviewVisual) return;
+    docPreviewVisual.focus();
+    if(!font){
+      docPreviewVisual.style.fontFamily = 'inherit';
+    } else {
+      docPreviewVisual.style.fontFamily = font;
+      // If user has highlighted specific text, apply font to selection
+      const sel = window.getSelection();
+      if(sel && sel.rangeCount > 0 && !sel.isCollapsed){
+        document.execCommand('fontName', false, font);
+      }
+    }
+    syncVisualToText();
+  });
+}
+
+// External Photo Upload Handler
+if(btnInsertPhoto && editorImageInput){
+  btnInsertPhoto.addEventListener('click', (e) => {
+    e.preventDefault();
+    if(isSourceView){
+      alert('Please switch back to Visual mode to insert photos.');
+      return;
+    }
+    editorImageInput.click();
+  });
+
+  editorImageInput.addEventListener('change', async () => {
+    const file = editorImageInput.files[0];
+    if(!file) return;
+
+    if(file.size > 5 * 1024 * 1024){
+      alert('Selected photo exceeds the 5 MB limit. Please select a photo under 5 MB.');
+      editorImageInput.value = '';
+      return;
+    }
+
+    btnInsertPhoto.disabled = true;
+    btnInsertPhoto.innerHTML = 'Uploading photo… <span>⏳</span>';
+
+    try {
+      let finalImgUrl = '';
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const res = await api('/api/admin/vlogs/upload-body-image', { method: 'POST', body: fd });
+        if(res && res.url) finalImgUrl = res.url;
+      } catch(err) {
+        // Fallback to Base64 Data URL if offline or local server
+        finalImgUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if(finalImgUrl && docPreviewVisual){
+        docPreviewVisual.focus();
+        const photoCaption = prompt('Optional caption for this photo (leave empty for none):', '');
+        const captionHtml = photoCaption && photoCaption.trim()
+          ? `<figcaption style="font-size:12px;color:var(--muted);font-style:italic;margin-top:6px;">${esc(photoCaption.trim())}</figcaption>`
+          : '';
+        const figureHtml = `
+          <figure style="margin:20px 0;text-align:center;">
+            <img src="${finalImgUrl}" alt="${esc(photoCaption || 'Vlog photo')}" style="max-width:100%;height:auto;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.08);display:block;margin:0 auto;" />
+            ${captionHtml}
+          </figure>
+          <p><br></p>
+        `;
+        document.execCommand('insertHTML', false, figureHtml);
+        syncVisualToText();
+      }
+    } catch(err) {
+      alert('Error inserting photo: ' + err.message);
+    } finally {
+      btnInsertPhoto.disabled = false;
+      btnInsertPhoto.innerHTML = '📷 Insert Photo';
+      editorImageInput.value = '';
+    }
+  });
+}
+
+// Toggle Visual / Source View
+if(btnToggleSource){
+  btnToggleSource.addEventListener('click', (e) => {
+    e.preventDefault();
+    isSourceView = !isSourceView;
+    if(isSourceView){
+      if(docPreviewText && docPreviewVisual){
+        docPreviewText.value = docPreviewVisual.innerHTML;
+        docPreviewVisual.style.display = 'none';
+        docPreviewText.style.display = 'block';
+        docPreviewText.focus();
+      }
+      btnToggleSource.textContent = '👁 Visual View';
+      btnToggleSource.style.background = 'var(--lime)';
+    } else {
+      if(docPreviewText && docPreviewVisual){
+        docPreviewVisual.innerHTML = docPreviewText.value;
+        docPreviewText.style.display = 'none';
+        docPreviewVisual.style.display = 'block';
+        docPreviewVisual.focus();
+      }
+      btnToggleSource.textContent = '</> Source';
+      btnToggleSource.style.background = '#fff';
+    }
+    updateDocPreviewWordCount();
+  });
 }
 
 function updateAuthorBioWordCount(){
@@ -630,8 +841,7 @@ fileInput.addEventListener('change',async()=>{
 
   if(!f){
     if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
-    if(docPreviewText) docPreviewText.value='';
-    if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+    setPreviewContent('');
     return;
   }
 
@@ -642,26 +852,22 @@ fileInput.addEventListener('change',async()=>{
     if(errEl) errEl.textContent=`Word document exceeds the 5 MB limit (${sizeMb} MB). Please choose a file under 5 MB.`;
     fileInput.value='';
     if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
-    if(docPreviewText) docPreviewText.value='';
-    if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+    setPreviewContent('');
     return;
   }
 
   if(docPreviewContainer) docPreviewContainer.classList.remove('hidden');
-  if(docPreviewText) docPreviewText.value='Parsing document preview…';
+  setPreviewContent('Parsing document preview…');
   if(docPreviewWordCount) docPreviewWordCount.textContent='Parsing…';
 
   try{
     const fd=new FormData();
     fd.append('document',f);
     const result=await api('/api/admin/vlogs/preview',{method:'POST',body:fd});
-    if(docPreviewText){
-      docPreviewText.value=result.body_text||'';
-      updateDocPreviewWordCount();
-    }
+    setPreviewContent(result.body_text||'');
   }catch(err){
     if(errEl) errEl.textContent=err.message;
-    if(docPreviewText) docPreviewText.value='';
+    setPreviewContent('');
     if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
   }
 });
@@ -855,10 +1061,7 @@ function startEditingVlog(vlog){
 
   // Prepopulate editable document preview textbox
   if(docPreviewContainer) docPreviewContainer.classList.remove('hidden');
-  if(docPreviewText){
-    docPreviewText.value=vlog.body_text||'';
-    updateDocPreviewWordCount();
-  }
+  setPreviewContent(vlog.body_text||'');
 
   // Clear file inputs and reset removal flags
   fileInput.value='';
@@ -977,8 +1180,7 @@ function exitEditMode(){
 
   uploadForm.reset();
   if(docPreviewContainer) docPreviewContainer.classList.add('hidden');
-  if(docPreviewText) docPreviewText.value='';
-  if(docPreviewWordCount) docPreviewWordCount.textContent='0 / 6,000 words';
+  setPreviewContent('');
   if(authorBioWordCount) authorBioWordCount.textContent='0 / 200 words';
   if(authorImagePreview){
     authorImagePreview.innerHTML='';
@@ -999,6 +1201,7 @@ function exitEditMode(){
 uploadForm.addEventListener('submit',async e=>{
   e.preventDefault();
   if(isPublishing)return;
+  syncVisualToText();
   const isEditing=Boolean(currentEditingVlogId);
   const submitBtn=uploadForm.querySelector('button[type="submit"]');
   const errEl=document.querySelector('#uploadError');

@@ -55,11 +55,29 @@
     return String(dateStr).split(' ')[0] || 'Recent';
   }
 
+  function sanitizeRichHtml(html) {
+    if (!html) return '';
+    // Strip malicious script tags, iframes, styles, embed, object
+    let clean = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    clean = clean.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    clean = clean.replace(/<\/?(iframe|object|embed|form|input|button|textarea|select)\b[^>]*>/gi, '');
+    // Strip inline JavaScript handlers (onclick, onload, onerror, etc.)
+    clean = clean.replace(/\s+on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+    // Strip javascript: pseudo-protocols in src/href
+    clean = clean.replace(/\s+(href|src)\s*=\s*(?:'javascript:[^']*'|"javascript:[^"]*"|javascript:[^\s>]+)/gi, '');
+    return clean;
+  }
+
   function formatBodyText(text, fallbackExcerpt = '') {
     const content = (text && text.trim()) ? text : (fallbackExcerpt && fallbackExcerpt.trim() ? fallbackExcerpt : '');
     if (!content) return '<p class="muted">No written content available for this film.</p>';
     
-    // Normalize line breaks and split paragraphs
+    // Check if content already contains rich HTML markup (tags like <p>, <div>, <b>, <i>, <u>, <img>, <ul>, etc.)
+    if (/<[a-z][\s\S]*>/i.test(content)) {
+      return sanitizeRichHtml(content);
+    }
+
+    // Normalize line breaks and split plain text paragraphs
     const rawParagraphs = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split(/\n+/);
     const cleanParagraphs = rawParagraphs.map(p => p.trim()).filter(Boolean);
     

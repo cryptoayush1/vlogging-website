@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Notes Studio</title><link rel="stylesheet" href="admin.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Field Notes Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Hind+Siliguri:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
 <body>
   <main class="auth-shell" id="loginView"><section class="auth-card"><div class="brand-mark">FIELD<br><span>NOTES</span></div><p class="kicker">Private studio</p><h1>Welcome back.</h1><p class="muted">Sign in to publish a new vlog to the Field Notes journal.</p><form id="loginForm"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="primary" type="submit">Enter studio <span>↗</span></button><p class="form-error" id="loginError"></p></form><button type="button" class="secondary-button" id="registerButton">Register</button><a class="back-link" href="https://cryptoayush1-vlogging-website.vercel.app/" target="_blank" rel="noopener">← Return to public site ↗</a><small id="loginDbBadge" style="display:block;margin-top:20px;color:var(--muted);font-size:11px;text-align:center;">● Checking database connection…</small></section></main>
   <main class="auth-shell hidden" id="registerView"><section class="auth-card"><div class="brand-mark">FIELD<br><span>NOTES</span></div><p class="kicker">Create access</p><h1>Register.</h1><p class="muted" id="registerMuted">Create a co-admin account. The administrator controls final access.</p><form id="registerForm"><label>Username<input name="username" minlength="3" required></label><label>Gmail<input type="email" name="email" placeholder="you@gmail.com" required></label><label>Password<input type="password" name="password" minlength="8" required></label><label>Repeat password<input type="password" name="repeat_password" minlength="8" required></label><label>Account type<select name="role" id="roleSelect"><option value="admin" id="optAdmin">Admin</option><option value="coadmin" id="optCoadmin">Co-admin</option></select></label><button class="primary" type="submit">Verify & register <span>↗</span></button><p class="form-error" id="registerError"></p></form><button type="button" class="back-link" id="backToLogin">← Back to login</button><small id="registerDbBadge" style="display:block;margin-top:20px;color:var(--muted);font-size:11px;text-align:center;">● Checking database connection…</small></section></main>
@@ -68,11 +76,78 @@
 
               <div id="docPreviewContainer" class="hidden" style="margin-top:19px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                  <label for="docPreviewText" style="margin:0;font-weight:600;">Editable Document Preview</label>
+                  <label for="docPreviewText" style="margin:0;font-weight:600;">Editable Document Preview & Formatting</label>
                   <span id="docPreviewWordCount" style="font-size:12px;color:var(--muted);font-weight:600;">0 / 6,000 words</span>
                 </div>
-                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="resize:both;min-height:140px;line-height:1.6;font-family:inherit;"></textarea>
-                <small style="color:var(--muted);display:block;margin-top:6px;font-size:11px;">Adjustable textbox (drag bottom-right corner to resize horizontally and vertically) · Edits will be published into the vlog · Max 6,000 words</small>
+
+                <!-- Rich Text Editor Toolbar -->
+                <div class="editor-toolbar" id="editorToolbar" role="toolbar" aria-label="Editor formatting toolbar">
+                  <!-- Language & Font Family -->
+                  <select class="editor-tool-select" id="editorFontFamily" title="Select Language / Font">
+                    <option value="">Font: Default</option>
+                    <option value="'Hind Siliguri', 'Noto Sans Bengali', sans-serif">বাংলা (Bengali - Hind Siliguri)</option>
+                    <option value="'Libre Baskerville', Georgia, serif">English (Editorial Serif)</option>
+                    <option value="'DM Sans', Arial, sans-serif">English (Modern Sans)</option>
+                  </select>
+
+                  <!-- Font Size -->
+                  <select class="editor-tool-select" id="editorFontSize" title="Font Size">
+                    <option value="">Size: Normal</option>
+                    <option value="1">Small (13px)</option>
+                    <option value="3">Normal (16px)</option>
+                    <option value="4">Medium (18px)</option>
+                    <option value="5">Large (22px)</option>
+                    <option value="6">Huge (28px)</option>
+                  </select>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Text Formatting -->
+                  <button type="button" class="editor-tool-btn" id="btnBold" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                  <button type="button" class="editor-tool-btn" id="btnItalic" data-cmd="italic" title="Italics (Ctrl+I)"><i>I</i></button>
+                  <button type="button" class="editor-tool-btn" id="btnUnderline" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                  <button type="button" class="editor-tool-btn" id="btnLink" title="Insert Hyperlink">🔗 Link</button>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Justification & Alignment -->
+                  <button type="button" class="editor-tool-btn" id="btnAlignLeft" data-cmd="justifyLeft" title="Align Left">⇤ Left</button>
+                  <button type="button" class="editor-tool-btn" id="btnAlignCenter" data-cmd="justifyCenter" title="Align Center">↔ Center</button>
+                  <button type="button" class="editor-tool-btn" id="btnAlignRight" data-cmd="justifyRight" title="Align Right">⇥ Right</button>
+                  <button type="button" class="editor-tool-btn" id="btnAlignJustify" data-cmd="justifyFull" title="Justify Text">≡ Justify</button>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Lists & Bullets -->
+                  <button type="button" class="editor-tool-btn" id="btnBulletList" data-cmd="insertUnorderedList" title="Point Bullets">• Bullets</button>
+                  <button type="button" class="editor-tool-btn" id="btnNumberList" data-cmd="insertOrderedList" title="Number Bullets">1. Numbers</button>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- External Photo Upload -->
+                  <button type="button" class="editor-tool-btn photo-btn" id="btnInsertPhoto" title="Upload external photo into vlog text">
+                    📷 Insert Photo
+                  </button>
+                  <input type="file" id="editorImageInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;">
+
+                  <!-- Toggle Source Code -->
+                  <button type="button" class="editor-tool-btn" id="btnToggleSource" title="Toggle HTML source code" style="margin-left:auto;">
+                    &lt;/&gt; Source
+                  </button>
+                </div>
+
+                <!-- Visual WYSIWYG Editable Box -->
+                <div id="docPreviewVisual" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true"
+                     placeholder="Document preview will appear here once selected. You can format text, add bullets, align paragraphs, and insert photos."
+                     style="resize:both;min-height:160px;min-width:200px;max-width:100%;line-height:1.75;outline:none;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;padding:14px 16px;overflow-y:auto;font-family:inherit;">
+                </div>
+
+                <!-- Synchronized Textarea for Direct Editing and Form Submission -->
+                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="display:none;resize:both;min-height:160px;line-height:1.6;font-family:inherit;"></textarea>
+                
+                <small style="color:var(--muted);display:block;margin-top:6px;font-size:11px;">
+                  Adjustable editor (drag bottom-right corner to resize horizontally and vertically) · Bold, Italics, Underline, Links, Alignment, Bullets, Fonts, and Photos will be published into the vlog · Max 6,000 words
+                </small>
               </div>
 
               <label class="file-drop image-drop" id="authorImageDrop" style="margin-top:16px">

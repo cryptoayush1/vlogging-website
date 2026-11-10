@@ -151,8 +151,16 @@ async function loadPublishedVlogs(){
         if (readerExcerpt) readerExcerpt.textContent = updatedVlog.excerpt;
         if (readerLength) readerLength.textContent = updatedVlog.length;
         if (readerBody && updatedVlog.body_text) {
-          const paras = updatedVlog.body_text.split(/\n\s*\n/).filter(p => p.trim());
-          readerBody.innerHTML = paras.map(p => `<p>${esc(p.trim())}</p>`).join('');
+          const content = updatedVlog.body_text.trim();
+          if (/<[a-z][\s\S]*>/i.test(content)) {
+            let clean = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+            clean = clean.replace(/<\/?(iframe|object|embed|form|input|button|textarea|select)\b[^>]*>/gi, '');
+            clean = clean.replace(/\s+on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+            readerBody.innerHTML = clean;
+          } else {
+            const paras = content.split(/\n\s*\n/).filter(p => p.trim());
+            readerBody.innerHTML = paras.map(p => `<p>${esc(p.trim())}</p>`).join('');
+          }
         }
         if (readerAuthorName) readerAuthorName.textContent = updatedVlog.author || 'Field Notes Author';
         if (readerAuthorBio) readerAuthorBio.textContent = updatedVlog.author_bio || 'Contributor to the Field Notes journal archive.';
