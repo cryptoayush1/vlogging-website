@@ -940,32 +940,222 @@ if (btnPicMoveDown) {
   });
 }
 
+// Direct Mouse Drag & Drop Repositioning (No duplicates, moves with cursor, stays where dropped)
+let isDraggingPhoto = false;
+let draggedPhotoNode = null;
+let pendingDragTarget = null;
+let mouseDownX = 0;
+let mouseDownY = 0;
+let ghostFollower = null;
+
+// Strictly prevent native browser drag from duplicating photos in contenteditable
+if (docPreviewVisual) {
+  docPreviewVisual.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+    return false;
+  });
+}
+
+function startPhotoDrag(targetNode, clientX, clientY) {
+  if (!targetNode) return;
+  isDraggingPhoto = true;
+  draggedPhotoNode = targetNode.closest('figure') || targetNode;
+
+  if (imgResizeOverlay) imgResizeOverlay.classList.add('hidden');
+
+  draggedPhotoNode.classList.add('is-dragging');
+  draggedPhotoNode.style.opacity = '0.35';
+
+  const img = draggedPhotoNode.querySelector('img') || draggedPhotoNode;
+  ghostFollower = document.createElement('div');
+  ghostFollower.className = 'photo-drag-ghost';
+  ghostFollower.innerHTML = `<img src="${img.src}" style="width:110px;height:auto;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.35);border:2px solid #5c751f;display:block;">`;
+  ghostFollower.style.position = 'fixed';
+  ghostFollower.style.pointerEvents = 'none';
+  ghostFollower.style.zIndex = '99999';
+  ghostFollower.style.left = `${clientX - 55}px`;
+  ghostFollower.style.top = `${clientY - 40}px`;
+  ghostFollower.style.transform = 'scale(1.05)';
+  ghostFollower.style.transition = 'transform 0.08s ease';
+  document.body.appendChild(ghostFollower);
+
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'grabbing';
+}
+
+function onPhotoMouseMove(e) {
+  if (!isDraggingPhoto || !draggedPhotoNode) return;
+
+  if (ghostFollower) {
+    ghostFollower.style.left = `${e.clientX - 55}px`;
+    ghostFollower.style.top = `${e.clientY - 40}px`;
+  }
+
+  const visualRect = docPreviewVisual.getBoundingClientRect();
+  const isOverEditor = (
+    e.clientX >= visualRect.left &&
+    e.clientX <= visualRect.right &&
+    e.clientY >= visualRect.top &&
+    e.clientY <= visualRect.bottom + 60
+  );
+
+  if (isOverEditor) {
+    showDropLine(e.clientX, e.clientY);
+  } else {
+    hideDropLine();
+  }
+}
+
+function onPhotoMouseUp(e) {
+  if (!isDraggingPhoto || !draggedPhotoNode) return;
+  isDraggingPhoto = false;
+
+  if (ghostFollower) {
+    ghostFollower.remove();
+    ghostFollower = null;
+  }
+
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+  hideDropLine();
+
+  draggedPhotoNode.style.opacity = '1';
+  draggedPhotoNode.classList.remove('is-dragging');
+
+  const clientX = e.clientX;
+  const clientY = e.clientY;
+  const visualRect = docPreviewVisual.getBoundingClientRect();
+
+  let placed = false;
+
+  // 1. Try caretRangeFromPoint / caretPositionFromPoint
+  let range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(clientX, clientY);
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(clientX, clientY);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+    }
+  }
+
+  if (range && docPreviewVisual.contains(range.startContainer) && !draggedPhotoNode.contains(range.startContainer)) {
+    let node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const parentBlock = node.closest('p, blockquote, div, h1, h2, h3, h4, figure') || node.parentElement;
+      if (parentBlock && parentBlock !== docPreviewVisual && docPreviewVisual.contains(parentBlock)) {
+        if (range.startOffset < (node.length / 2)) {
+          parentBlock.parentElement.insertBefore(draggedPhotoNode, parentBlock);
+        } else {
+          parentBlock.parentElement.insertBefore(draggedPhotoNode, parentBlock.nextSibling);
+        }
+        placed = true;
+      }
+    } else if (node === docPreviewVisual) {
+      if (range.startOffset < node.childNodes.length) {
+        node.insertBefore(draggedPhotoNode, node.childNodes[range.startOffset]);
+      } else {
+        node.appendChild(draggedPhotoNode);
+      }
+      placed = true;
+    } else {
+      const block = node.closest('p, blockquote, h1, h2, h3, h4, div, figure') || node;
+      if (block && block !== draggedPhotoNode && block.parentElement) {
+        block.parentElement.insertBefore(draggedPhotoNode, block.nextSibling);
+        placed = true;
+      }
+    }
+  }
+
+  // 2. Fallback: inspect element under cursor
+  if (!placed) {
+    draggedPhotoNode.style.display = 'none';
+    let el = document.elementFromPoint(clientX, clientY);
+    draggedPhotoNode.style.display = '';
+
+    if (el && docPreviewVisual.contains(el)) {
+      const block = el.closest('p, blockquote, h1, h2, h3, h4, div, figure') || el;
+      if (block && block !== draggedPhotoNode && docPreviewVisual.contains(block)) {
+        const rect = block.getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) {
+          block.parentElement.insertBefore(draggedPhotoNode, block);
+        } else {
+          block.parentElement.insertBefore(draggedPhotoNode, block.nextSibling);
+        }
+        placed = true;
+      }
+    }
+  }
+
+  // 3. Fallback: if dropped at top or bottom / empty area
+  if (!placed) {
+    if (clientY < visualRect.top + 60) {
+      docPreviewVisual.insertBefore(draggedPhotoNode, docPreviewVisual.firstChild);
+    } else {
+      docPreviewVisual.appendChild(draggedPhotoNode);
+    }
+    placed = true;
+  }
+
+  // Optional: Auto text-wrap adjustment if dropped near left or right margin
+  const relativeX = clientX - visualRect.left;
+  const editorWidth = visualRect.width;
+  if (relativeX < editorWidth * 0.28) {
+    draggedPhotoNode.style.float = 'left';
+    draggedPhotoNode.style.margin = '10px 20px 14px 0';
+    draggedPhotoNode.style.clear = 'left';
+  } else if (relativeX > editorWidth * 0.72) {
+    draggedPhotoNode.style.float = 'right';
+    draggedPhotoNode.style.margin = '10px 0 14px 20px';
+    draggedPhotoNode.style.clear = 'right';
+  }
+
+  // Ensure empty paragraph exists after figure so user can keep typing easily
+  if (!draggedPhotoNode.nextElementSibling || draggedPhotoNode.nextElementSibling.tagName === 'FIGURE') {
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    draggedPhotoNode.parentElement.insertBefore(p, draggedPhotoNode.nextSibling);
+  }
+
+  const img = draggedPhotoNode.querySelector('img') || (draggedPhotoNode.tagName === 'IMG' ? draggedPhotoNode : null);
+  draggedPhotoNode = null;
+
+  if (img) {
+    selectEditorImage(img);
+  }
+  syncVisualToText();
+}
+
 // Move pill on the selection overlay (drag to move)
 if (overlayMovePill) {
-  overlayMovePill.addEventListener('dragstart', (e) => {
+  overlayMovePill.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!activeSelectedImg) return;
-    const target = activeSelectedImg.closest('figure') || activeSelectedImg;
-    draggedItem = target;
-    draggedItem.classList.add('is-dragging');
-    imgResizeOverlay.classList.add('hidden');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', 'vlog-image-move');
-
-    if (e.dataTransfer.setDragImage && activeSelectedImg) {
-      try {
-        e.dataTransfer.setDragImage(activeSelectedImg, 40, 40);
-      } catch(err) {}
-    }
+    startPhotoDrag(activeSelectedImg, e.clientX, e.clientY);
   });
 }
 
 if (docPreviewVisual) {
+  // Listen for mousedown on images inside visual editor
+  docPreviewVisual.addEventListener('mousedown', (e) => {
+    if (isDraggingResize) return;
+    const img = e.target.closest('img');
+    if (img && docPreviewVisual.contains(img)) {
+      pendingDragTarget = img;
+      mouseDownX = e.clientX;
+      mouseDownY = e.clientY;
+    }
+  });
+
   docPreviewVisual.addEventListener('click', (e) => {
     const img = e.target.closest('img');
     if (img && docPreviewVisual.contains(img)) {
       e.stopPropagation();
       selectEditorImage(img);
-    } else if (!isDraggingResize) {
+    } else if (!isDraggingResize && !isDraggingPhoto) {
       deselectEditorImage();
     }
   });
@@ -973,159 +1163,29 @@ if (docPreviewVisual) {
   docPreviewVisual.addEventListener('scroll', () => {
     if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
   });
-
-  // DRAG & DROP REPOSITIONING (Moves picture to where the cursor is)
-  docPreviewVisual.addEventListener('dragstart', (e) => {
-    const target = e.target.closest('figure') || (e.target.tagName === 'IMG' ? e.target : null);
-    if (!target) return;
-
-    draggedItem = target;
-    draggedItem.classList.add('is-dragging');
-    if (imgResizeOverlay) imgResizeOverlay.classList.add('hidden');
-
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', 'vlog-image-move');
-
-    const img = target.querySelector('img') || (target.tagName === 'IMG' ? target : null);
-    if (img && e.dataTransfer.setDragImage) {
-      try {
-        e.dataTransfer.setDragImage(img, Math.min(img.clientWidth / 2, 80), Math.min(img.clientHeight / 2, 80));
-      } catch(err) {}
-    }
-  });
-
-  function handleEditorDragOver(e) {
-    if (!draggedItem) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    showDropLine(e.clientX, e.clientY);
-  }
-
-  function handleEditorDrop(e) {
-    if (!draggedItem) return;
-    e.preventDefault();
-    e.stopPropagation();
-    hideDropLine();
-
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-    let placed = false;
-
-    // 1. Try caretRangeFromPoint / caretPositionFromPoint
-    let range = null;
-    if (document.caretRangeFromPoint) {
-      range = document.caretRangeFromPoint(clientX, clientY);
-    } else if (document.caretPositionFromPoint) {
-      const pos = document.caretPositionFromPoint(clientX, clientY);
-      if (pos) {
-        range = document.createRange();
-        range.setStart(pos.offsetNode, pos.offset);
-        range.collapse(true);
-      }
-    }
-
-    if (range && docPreviewVisual.contains(range.startContainer) && !draggedItem.contains(range.startContainer)) {
-      let node = range.startContainer;
-      if (node.nodeType === Node.TEXT_NODE) {
-        const parentP = node.closest('p, blockquote, div, h1, h2, h3, h4, figure') || node.parentElement;
-        if (parentP && parentP !== docPreviewVisual && docPreviewVisual.contains(parentP)) {
-          if (range.startOffset < (node.length / 2)) {
-            parentP.parentElement.insertBefore(draggedItem, parentP);
-          } else {
-            parentP.parentElement.insertBefore(draggedItem, parentP.nextSibling);
-          }
-          placed = true;
-        }
-      } else if (node === docPreviewVisual) {
-        if (range.startOffset < node.childNodes.length) {
-          node.insertBefore(draggedItem, node.childNodes[range.startOffset]);
-        } else {
-          node.appendChild(draggedItem);
-        }
-        placed = true;
-      } else {
-        const block = node.closest('p, blockquote, h1, h2, h3, h4, div, figure') || node;
-        if (block && block !== draggedItem && block.parentElement) {
-          block.parentElement.insertBefore(draggedItem, block.nextSibling);
-          placed = true;
-        }
-      }
-    }
-
-    // 2. Fallback: find element directly under mouse cursor with elementFromPoint
-    if (!placed) {
-      let el = document.elementFromPoint(clientX, clientY);
-      if (el && draggedItem.contains(el)) {
-        draggedItem.style.visibility = 'hidden';
-        el = document.elementFromPoint(clientX, clientY);
-        draggedItem.style.visibility = '';
-      }
-
-      if (el && docPreviewVisual.contains(el)) {
-        const block = el.closest('p, blockquote, h1, h2, h3, h4, div, figure') || el;
-        if (block && block !== draggedItem && docPreviewVisual.contains(block)) {
-          const rect = block.getBoundingClientRect();
-          if (clientY < rect.top + rect.height / 2) {
-            block.parentElement.insertBefore(draggedItem, block);
-          } else {
-            block.parentElement.insertBefore(draggedItem, block.nextSibling);
-          }
-          placed = true;
-        }
-      }
-    }
-
-    // 3. Fallback: if dropped at top or bottom / empty area of editor
-    if (!placed) {
-      const visualRect = docPreviewVisual.getBoundingClientRect();
-      if (clientY < visualRect.top + 60) {
-        docPreviewVisual.insertBefore(draggedItem, docPreviewVisual.firstChild);
-      } else {
-        docPreviewVisual.appendChild(draggedItem);
-      }
-      placed = true;
-    }
-
-    // Ensure empty paragraph exists after figure so user can keep typing easily
-    if (!draggedItem.nextElementSibling || draggedItem.nextElementSibling.tagName === 'FIGURE') {
-      const p = document.createElement('p');
-      p.innerHTML = '<br>';
-      draggedItem.parentElement.insertBefore(p, draggedItem.nextSibling);
-    }
-
-    const img = draggedItem.querySelector('img') || (draggedItem.tagName === 'IMG' ? draggedItem : null);
-    draggedItem.classList.remove('is-dragging');
-    draggedItem = null;
-
-    makeImagesDraggable();
-    if (img) {
-      selectEditorImage(img);
-    }
-    syncVisualToText();
-  }
-
-  docPreviewVisual.addEventListener('dragover', handleEditorDragOver);
-  docPreviewVisual.addEventListener('drop', handleEditorDrop);
-
-  if (docPreviewVisual.parentElement) {
-    docPreviewVisual.parentElement.addEventListener('dragover', handleEditorDragOver);
-    docPreviewVisual.parentElement.addEventListener('drop', handleEditorDrop);
-  }
-
-  docPreviewVisual.addEventListener('dragleave', (e) => {
-    if (!docPreviewVisual.contains(e.relatedTarget)) {
-      hideDropLine();
-    }
-  });
-
-  docPreviewVisual.addEventListener('dragend', () => {
-    if (draggedItem) {
-      draggedItem.classList.remove('is-dragging');
-      draggedItem = null;
-    }
-    hideDropLine();
-  });
 }
+
+window.addEventListener('mousemove', (e) => {
+  // If user clicked an image and moved mouse > 4px, start dragging!
+  if (pendingDragTarget && !isDraggingPhoto && !isDraggingResize) {
+    const dist = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+    if (dist > 4) {
+      startPhotoDrag(pendingDragTarget, e.clientX, e.clientY);
+      pendingDragTarget = null;
+    }
+  }
+
+  if (isDraggingPhoto) {
+    onPhotoMouseMove(e);
+  }
+});
+
+window.addEventListener('mouseup', (e) => {
+  pendingDragTarget = null;
+  if (isDraggingPhoto) {
+    onPhotoMouseUp(e);
+  }
+});
 
 window.addEventListener('resize', () => {
   if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
