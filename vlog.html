@@ -3,462 +3,354 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Field Notes — Full article reading experience." />
-  <title id="pageTitle">Field Notes — Journal Reading</title>
+  <meta name="description" content="Field Notes — Full journal article and visual film reading." />
+  <title id="pageTitle">Field Notes — Reading Journal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
   <style>
+    /* Dedicated Full-Page Article View — Original Field Notes Palette */
     :root {
-      --crimson: #85101b;
-      --crimson-dark: #6e0c15;
-      --crimson-light: #9c1522;
-      --ink: #1f211d;
-      --ink-soft: #383b34;
-      --muted: #72766d;
-      --paper: #ffffff;
-      --paper-cream: #faf9f5;
-      --line: #e3e5dc;
-      --line-dark: rgba(255, 255, 255, 0.15);
+      --ink: #20221f;
+      --muted: #777b72;
+      --paper: #f5f5f0;
+      --white: #ffffff;
+      --line: #d8dad2;
       --lime: #d8e96b;
-      --blue: #3261cf;
-      --serif: 'Libre Baskerville', Georgia, 'Hind Siliguri', serif;
+      --dark: #20221f;
+      --serif: 'Libre Baskerville', Georgia, serif;
       --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
     body {
-      background: var(--paper-cream);
+      background: var(--paper);
       color: var(--ink);
       font-family: var(--sans);
+      margin: 0;
       line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
     }
 
-    a { color: inherit; text-decoration: none; }
-    img { max-width: 100%; height: auto; display: block; }
-    button, input, textarea { font: inherit; }
-
-    /* Reading Progress Bar */
+    /* Reading Progress Tracker */
     #readingProgressBar {
       position: fixed;
       top: 0;
       left: 0;
-      height: 4px;
+      height: 3px;
       width: 0%;
-      background: var(--lime);
+      background: var(--ink);
       z-index: 1000;
       transition: width 0.1s ease-out;
     }
 
-    /* Top Red Bar Header (Matching Robbar.in screenshot) */
-    .top-header-bar {
-      background: var(--crimson);
-      color: #fff;
-      padding: 16px 0;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-    }
-    .header-shell {
-      width: min(1200px, calc(100% - 40px));
-      margin: auto;
+    /* Original Site Header with Live Date & Day */
+    .article-site-header {
+      height: 88px;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper);
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-    .brand-group {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .brand-title {
-      font-family: var(--serif);
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      color: #fff;
-    }
-    .brand-dot-pill {
-      background: #fff;
-      color: var(--crimson);
-      font-size: 13px;
-      font-family: var(--sans);
-      font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 12px;
-      margin-left: 2px;
-      letter-spacing: 0;
-      display: inline-block;
-      vertical-align: middle;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    .brand-tagline {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.82);
-      font-weight: 400;
-      letter-spacing: 0.04em;
+      padding: 0 max(32px, calc((100vw - 1180px) / 2));
+      gap: 24px;
     }
 
-    .header-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 8px;
-    }
-    .live-date-strip {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.95);
+    .header-left {
       display: flex;
       align-items: center;
+      gap: 32px;
+    }
+
+    .wordmark {
+      font-size: 14px;
+      line-height: .82;
+      letter-spacing: .14em;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .wordmark span {
+      letter-spacing: .42em;
+    }
+
+    /* Live Date and Day Badge */
+    .live-date-pill {
+      display: inline-flex;
+      align-items: center;
       gap: 8px;
-      font-weight: 500;
+      padding: 6px 14px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
       letter-spacing: 0.02em;
     }
-    .live-dot {
+    .live-pulse-dot {
       width: 7px;
       height: 7px;
-      background: var(--lime);
+      background: #5c751f;
       border-radius: 50%;
       display: inline-block;
-      animation: live-blink 1.8s infinite;
+      animation: live-blink 2s infinite ease-in-out;
     }
     @keyframes live-blink {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 0.35; transform: scale(0.85); }
     }
 
-    .header-social-search {
+    .header-nav-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 20px;
     }
-    .header-social-links {
-      display: flex;
-      gap: 8px;
-    }
-    .social-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
-      display: grid;
-      place-items: center;
-      font-size: 13px;
-      transition: background 0.2s;
-    }
-    .social-btn:hover {
-      background: #fff;
-      color: var(--crimson);
-    }
-    .search-input-box {
-      position: relative;
-    }
-    .search-input-box input {
-      background: #fff;
-      border: none;
-      border-radius: 20px;
-      padding: 6px 14px 6px 32px;
-      font-size: 12px;
-      color: var(--ink);
-      width: 220px;
-      outline: none;
-      transition: width 0.3s;
-    }
-    .search-input-box input:focus {
-      width: 260px;
-      box-shadow: 0 0 0 2px var(--lime);
-    }
-    .search-icon {
-      position: absolute;
-      left: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      color: var(--muted);
-      pointer-events: none;
-    }
-
-    /* Sub-Navigation Bar (Charcoal Black) */
-    .sub-navbar {
-      background: #111210;
-      color: #fff;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      font-size: 13px;
-    }
-    .nav-shell {
-      width: min(1200px, calc(100% - 40px));
-      margin: auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      height: 46px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 22px;
-      white-space: nowrap;
-    }
-    .nav-link {
-      color: rgba(255, 255, 255, 0.85);
-      font-weight: 500;
-      transition: color 0.15s;
+    .back-home-button {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-    }
-    .nav-link:hover, .nav-link.active {
-      color: #fff;
-    }
-    .back-home-link {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 5px 12px;
-      border-radius: 4px;
-      font-weight: 600;
       font-size: 12px;
+      font-weight: 600;
+      padding: 8px 16px;
+      background: var(--white);
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      text-decoration: none;
     }
-    .back-home-link:hover {
-      background: var(--crimson);
-      color: #fff;
-    }
-    .nav-badge-right {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--lime);
-      font-weight: 700;
-      white-space: nowrap;
+    .back-home-button:hover {
+      background: var(--ink);
+      color: var(--white);
     }
 
     /* Breadcrumbs Bar */
-    .breadcrumb-bar {
-      background: var(--crimson-dark);
-      color: rgba(255, 255, 255, 0.8);
+    .article-breadcrumbs-bar {
+      background: var(--white);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 0;
       font-size: 11px;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
-    .breadcrumb-shell {
-      width: min(1200px, calc(100% - 40px));
+    .article-breadcrumbs-shell {
+      width: min(1180px, calc(100% - 40px));
       margin: auto;
       display: flex;
       align-items: center;
       gap: 8px;
-      overflow: hidden;
       white-space: nowrap;
+      overflow: hidden;
       text-overflow: ellipsis;
     }
-    .breadcrumb-bar a {
-      color: rgba(255, 255, 255, 0.85);
+    .article-breadcrumbs-shell a {
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 500;
     }
-    .breadcrumb-bar a:hover {
-      color: #fff;
-      text-decoration: underline;
+    .article-breadcrumbs-shell a:hover {
+      color: var(--ink);
     }
-    .breadcrumb-sep {
-      opacity: 0.5;
-    }
-    .breadcrumb-current {
-      color: #fff;
-      font-weight: 600;
+    .breadcrumb-current-title {
+      color: var(--ink);
+      font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    /* Editorial Hero Presentation Section (Matching Screenshot) */
-    .hero-presentation {
-      background: var(--crimson);
-      color: #fff;
-      padding: 48px 0 56px;
-      position: relative;
-      border-bottom: 4px solid var(--crimson-dark);
+    /* Hero Presentation Section (Matching Field Notes Light Editorial Theme) */
+    .article-hero-block {
+      padding: 56px 0 64px;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
     }
-    .hero-shell {
-      width: min(1200px, calc(100% - 40px));
+    .article-hero-shell {
+      width: min(1180px, calc(100% - 40px));
       margin: auto;
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
-      gap: 48px;
-      align-items: center;
-    }
-    .hero-lead-col {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .category-kicker {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--lime);
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .hero-title {
-      font-family: var(--serif);
-      font-size: clamp(32px, 4.5vw, 52px);
-      font-weight: 700;
-      line-height: 1.14;
-      letter-spacing: -0.025em;
-      color: #ffffff;
-      margin: 0;
-      text-shadow: 0 2px 12px rgba(0,0,0,0.18);
-    }
-    .hero-excerpt {
-      font-family: var(--serif);
-      font-size: 16px;
-      line-height: 1.75;
-      color: rgba(255, 255, 255, 0.94);
-      margin: 0;
-      padding-top: 4px;
+      gap: 56px;
+      align-items: start;
     }
 
-    .hero-author-row {
+    .hero-text-col {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .article-eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #727c28;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-article-title {
+      font-family: var(--serif);
+      font-size: clamp(34px, 5vw, 54px);
+      font-weight: 400;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      margin: 0;
+    }
+    .hero-lead-excerpt {
+      font-size: 18px;
+      line-height: 1.65;
+      color: #4a4e44;
+      font-family: var(--serif);
+      font-style: italic;
+      margin: 0;
+      padding-left: 18px;
+      border-left: 2px solid var(--lime);
+    }
+
+    /* Author Spotlight Byline */
+    .hero-author-strip {
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-top: 12px;
-      padding-top: 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      gap: 16px;
+      margin-top: 14px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
     }
-    .author-circle {
-      width: 54px;
-      height: 54px;
+    .author-circle-avatar {
+      width: 58px;
+      height: 58px;
       border-radius: 50%;
-      background: #fff;
-      border: 3px solid #fff;
+      background: var(--white);
+      border: 2px solid var(--line);
       background-size: cover;
       background-position: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      flex-shrink: 0;
       display: grid;
       place-items: center;
-      color: var(--crimson);
+      color: var(--ink);
       font-family: var(--serif);
       font-weight: 700;
       font-size: 18px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
-    .author-meta-info {
+    .author-strip-info {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
-    .author-meta-info strong {
-      font-size: 16px;
-      font-family: var(--serif);
-      color: #fff;
+    .author-strip-name {
+      font-size: 15px;
       font-weight: 700;
+      color: var(--ink);
     }
-    .author-meta-info span {
+    .author-strip-bio {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.8);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .author-strip-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
     }
 
+    /* Right Column: Featured Image / Visual Frame */
     .hero-visual-col {
-      position: relative;
-    }
-    .hero-visual-frame {
-      border-radius: 8px;
-      overflow: hidden;
-      border: 2px solid rgba(255, 255, 255, 0.25);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-      position: relative;
-      background: #111;
-      aspect-ratio: 16 / 10;
       display: flex;
-      align-items: flex-end;
+      flex-direction: column;
+      gap: 12px;
     }
-    .hero-visual-img {
+    .hero-visual-card {
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(32, 34, 31, 0.06);
+      position: relative;
+    }
+    .hero-visual-thumb {
       width: 100%;
-      height: 100%;
-      object-fit: cover;
+      height: 340px;
+      background-color: #20221f;
+      background-size: cover;
+      background-position: center;
       display: block;
+      position: relative;
     }
-    .hero-visual-badge {
+    .visual-category-badge {
       position: absolute;
       top: 14px;
       left: 14px;
-      background: var(--crimson);
-      color: #fff;
-      font-size: 11px;
+      background: var(--lime);
+      color: var(--ink);
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      padding: 5px 12px;
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 5px 10px;
+      border-radius: 2px;
     }
-    .hero-visual-watermark {
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(4px);
-      color: #fff;
+    .visual-caption-bar {
+      padding: 12px 16px;
+      background: var(--white);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 11px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
     }
 
-    /* Article Reading Body Canvas */
-    .article-reading-section {
-      background: #fff;
-      padding: 60px 0 80px;
+    /* Main Reading Canvas */
+    .article-reading-body {
+      background: var(--white);
+      padding: 64px 0 90px;
       border-bottom: 1px solid var(--line);
     }
-    .reading-shell {
-      width: min(840px, calc(100% - 40px));
+    .article-reading-shell {
+      width: min(780px, calc(100% - 40px));
       margin: auto;
     }
 
-    .article-meta-bar {
+    .reading-meta-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-bottom: 24px;
-      margin-bottom: 36px;
+      margin-bottom: 40px;
       border-bottom: 1px solid var(--line);
       flex-wrap: wrap;
       gap: 16px;
       font-size: 12px;
       color: var(--muted);
     }
-    .article-meta-left {
+    .reading-meta-tags {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       flex-wrap: wrap;
     }
-    .meta-pill {
-      background: var(--paper-cream);
+    .reading-tag-pill {
+      background: var(--paper);
       border: 1px solid var(--line);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 3px;
       font-weight: 600;
       color: var(--ink);
+      font-size: 11px;
     }
-    .share-pill-group {
+    .reading-action-btns {
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .share-pill-btn {
-      background: #fff;
+    .reading-action-btn {
+      background: var(--white);
       border: 1px solid var(--line);
-      padding: 5px 11px;
-      border-radius: 4px;
+      padding: 6px 12px;
+      border-radius: 3px;
       font-size: 11px;
       font-weight: 600;
       color: var(--ink);
@@ -466,292 +358,271 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
+      text-decoration: none;
     }
-    .share-pill-btn:hover {
-      background: var(--crimson);
-      color: #fff;
-      border-color: var(--crimson);
+    .reading-action-btn:hover {
+      border-color: var(--ink);
+      background: var(--paper);
     }
 
-    /* Magazine Typography */
-    .article-body-content {
+    /* Article Body Typography (Original Field Notes Libre Baskerville) */
+    .formatted-article-body {
       font-family: var(--serif);
       font-size: 19px;
       line-height: 1.88;
-      color: #262923;
+      color: #2b2e27;
     }
-    .article-body-content p {
-      margin-bottom: 1.6em;
+    .formatted-article-body p {
+      margin-bottom: 1.5em;
     }
-    .article-body-content p:first-of-type::first-letter {
-      font-size: 58px;
+    .formatted-article-body p:first-of-type::first-letter {
+      font-size: 64px;
       line-height: 0.85;
       float: left;
-      margin: 8px 12px 0 0;
-      color: var(--crimson);
+      margin: 8px 14px 0 0;
+      color: var(--ink);
       font-family: var(--serif);
       font-weight: 700;
     }
-    .article-body-content blockquote {
-      border-left: 3px solid var(--crimson);
-      margin: 2em 0;
+    .formatted-article-body blockquote {
+      border-left: 2px solid var(--lime);
+      margin: 2.2em 0;
       padding: 12px 0 12px 24px;
       font-style: italic;
-      color: #43473e;
-      background: var(--paper-cream);
-      border-radius: 0 4px 4px 0;
+      color: #454940;
+      background: var(--paper);
     }
-    .article-body-content h2, .article-body-content h3 {
+    .formatted-article-body h2, .formatted-article-body h3 {
       font-family: var(--serif);
+      font-weight: 400;
       color: var(--ink);
       margin: 2em 0 0.8em;
       line-height: 1.25;
     }
 
-    /* Author Profile Card in Body */
-    .author-card-box {
-      margin-top: 56px;
-      padding: 28px;
-      background: var(--paper-cream);
-      border: 1px solid var(--line);
-      border-radius: 8px;
+    /* Attached Document Pill */
+    .attached-doc-card {
+      margin-top: 48px;
+      padding: 20px 24px;
+      background: var(--paper);
+      border: 1px dashed var(--line);
+      border-radius: 4px;
       display: flex;
-      gap: 22px;
+      justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
     }
-    .author-card-avatar {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: #fff;
-      border: 2px solid var(--line);
-      background-size: cover;
-      background-position: center;
-      flex-shrink: 0;
-      display: grid;
-      place-items: center;
-      font-family: var(--serif);
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--crimson);
-    }
-    .author-card-text strong {
-      font-size: 17px;
-      font-family: var(--serif);
+    .attached-doc-info strong {
       display: block;
+      font-size: 13px;
       color: var(--ink);
     }
-    .author-card-text p {
-      margin: 6px 0 0;
-      font-size: 13px;
+    .attached-doc-info small {
       color: var(--muted);
-      line-height: 1.6;
+      font-size: 11px;
     }
 
-    /* Reader Dialogue & Reflections Section */
-    .dialogue-section {
-      background: var(--paper-cream);
-      padding: 70px 0 90px;
+    /* Reader Dialogue & Reflections (Original Style) */
+    .reflections-wrapper {
+      background: var(--paper);
+      padding: 72px 0 96px;
       border-bottom: 1px solid var(--line);
     }
-    .dialogue-shell {
-      width: min(840px, calc(100% - 40px));
+    .reflections-shell {
+      width: min(780px, calc(100% - 40px));
       margin: auto;
     }
-    .dialogue-header {
+    .reflections-heading-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      border-bottom: 2px solid var(--line);
-      padding-bottom: 16px;
-      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+      margin-bottom: 32px;
     }
-    .dialogue-header h3 {
+    .reflections-heading-row h3 {
       font-family: var(--serif);
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 400;
       margin: 0;
       color: var(--ink);
     }
-    .dialogue-count-badge {
-      background: #fff;
+    .reflections-count-tag {
+      background: var(--white);
       border: 1px solid var(--line);
       padding: 4px 12px;
-      border-radius: 14px;
+      border-radius: 20px;
       font-size: 11px;
       font-weight: 600;
       color: var(--muted);
     }
 
-    .feedback-input-card {
-      background: #fff;
+    .reflection-submit-box {
+      background: var(--white);
       border: 1px solid var(--line);
-      border-radius: 8px;
       padding: 28px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.02);
-      margin-bottom: 36px;
+      margin-bottom: 40px;
+      border-radius: 4px;
     }
-    .feedback-input-card h4 {
+    .reflection-submit-box h4 {
       font-family: var(--serif);
       font-size: 18px;
+      font-weight: 400;
       margin: 0 0 16px;
       color: var(--ink);
-      font-weight: 400;
     }
-    .form-two-col {
+    .feedback-two-col {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 14px;
       margin-bottom: 14px;
     }
-    .form-input, .form-textarea {
+    .feedback-input, .feedback-textarea {
       width: 100%;
-      padding: 12px 14px;
       border: 1px solid var(--line);
-      border-radius: 4px;
-      font-size: 13px;
-      color: var(--ink);
       background: #fff;
+      padding: 12px 14px;
+      font-size: 13px;
       outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .form-input:focus, .form-textarea:focus {
-      border-color: var(--crimson);
-      box-shadow: 0 0 0 3px rgba(133, 16, 27, 0.12);
-    }
-    .form-textarea {
-      resize: vertical;
-      min-height: 110px;
-      margin-bottom: 16px;
+      color: var(--ink);
+      border-radius: 3px;
       font-family: inherit;
+      box-sizing: border-box;
     }
-    .submit-reflection-btn {
-      background: var(--crimson);
+    .feedback-input:focus, .feedback-textarea:focus {
+      border-color: #3261cf;
+      box-shadow: 0 0 0 3px rgba(50, 97, 207, 0.12);
+    }
+    .feedback-textarea {
+      resize: vertical;
+      min-height: 100px;
+      margin-bottom: 16px;
+    }
+    .submit-comment-button {
+      background: var(--ink);
       color: #fff;
       border: none;
-      padding: 12px 26px;
-      border-radius: 4px;
+      padding: 12px 24px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      border-radius: 3px;
       transition: background 0.15s;
     }
-    .submit-reflection-btn:hover {
-      background: var(--crimson-dark);
+    .submit-comment-button:hover {
+      background: #353831;
+    }
+    .submit-comment-button span:last-child {
+      color: var(--lime);
     }
 
-    .reflections-stream {
+    .reflections-list-container {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-    .reflection-item {
-      background: #fff;
+    .reflection-card-item {
+      background: var(--white);
       border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 20px 24px;
+      padding: 22px 26px;
+      border-radius: 4px;
     }
-    .reflection-meta {
+    .reflection-card-meta {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       font-size: 12px;
     }
-    .reflection-author {
-      font-weight: 700;
+    .reflection-card-meta strong {
       color: var(--ink);
     }
-    .reflection-date {
+    .reflection-card-meta small {
       color: var(--muted);
     }
-    .reflection-body {
+    .reflection-card-comment {
       font-family: var(--serif);
       font-size: 14px;
       line-height: 1.65;
-      color: #3b3f36;
+      color: #383c34;
       margin: 0;
     }
 
-    /* More From Field Notes Carousel / Grid */
-    .more-stories-section {
-      padding: 70px 0 90px;
-      background: #fff;
+    /* More Films Shelf */
+    .more-films-shelf {
+      background: var(--white);
+      padding: 72px 0 96px;
+      border-bottom: 1px solid var(--line);
     }
-    .more-shell {
-      width: min(1200px, calc(100% - 40px));
+    .more-films-shell {
+      width: min(1180px, calc(100% - 40px));
       margin: auto;
     }
-    .more-header {
-      margin-bottom: 32px;
+    .more-films-header {
+      margin-bottom: 36px;
     }
-    .more-header p {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--muted);
-      font-weight: 700;
-      margin-bottom: 6px;
+    .more-films-header .eyebrow {
+      margin-bottom: 8px;
     }
-    .more-header h3 {
+    .more-films-header h3 {
       font-family: var(--serif);
-      font-size: 30px;
+      font-size: 32px;
       font-weight: 400;
       margin: 0;
     }
-    .more-grid {
+    .more-films-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 28px;
     }
-    .more-card {
-      background: var(--paper-cream);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.2s, box-shadow 0.2s;
+    .more-vlog-item {
       cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 16px;
+      border-radius: 4px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .more-card:hover {
+    .more-vlog-item:hover {
       transform: translateY(-3px);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
     }
-    .more-thumb {
+    .more-vlog-thumb {
       height: 180px;
       background-size: cover;
       background-position: center;
-      background-color: #222;
+      background-color: #20221f;
+      margin-bottom: 14px;
+      border-radius: 2px;
     }
-    .more-card-content {
-      padding: 20px;
+    .more-vlog-meta {
       display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-    .more-card-category {
+      justify-content: space-between;
       font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--crimson);
-      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--muted);
       margin-bottom: 8px;
     }
-    .more-card-title {
+    .more-vlog-title {
       font-family: var(--serif);
       font-size: 18px;
       line-height: 1.3;
       margin: 0 0 8px;
       color: var(--ink);
     }
-    .more-card-excerpt {
+    .more-vlog-excerpt {
       font-size: 12px;
       color: var(--muted);
       line-height: 1.5;
+      margin: 0;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -759,14 +630,16 @@
     }
 
     /* Footer */
-    .site-footer {
-      background: #111210;
-      color: rgba(255, 255, 255, 0.7);
-      padding: 40px 0;
-      font-size: 12px;
+    .article-site-footer {
+      border-top: 1px solid var(--line);
+      padding: 32px 0 40px;
+      background: var(--paper);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
     }
-    .footer-shell {
-      width: min(1200px, calc(100% - 40px));
+    .footer-shell-content {
+      width: min(1180px, calc(100% - 40px));
       margin: auto;
       display: flex;
       justify-content: space-between;
@@ -774,226 +647,201 @@
       flex-wrap: wrap;
       gap: 16px;
     }
-    .footer-brand {
-      font-family: var(--serif);
-      font-size: 18px;
-      color: #fff;
-      font-weight: 700;
-    }
 
-    /* Responsive */
     @media (max-width: 900px) {
-      .hero-shell {
+      .article-hero-shell {
         grid-template-columns: 1fr;
-        gap: 32px;
+        gap: 36px;
       }
-      .header-right {
+      .article-site-header {
+        height: auto;
+        padding: 16px 20px;
+        flex-direction: column;
         align-items: flex-start;
-        width: 100%;
+        gap: 14px;
       }
-      .header-social-search {
+      .header-left, .header-nav-right {
         width: 100%;
         justify-content: space-between;
       }
-      .more-grid {
+      .more-films-grid {
         grid-template-columns: 1fr;
       }
-      .form-two-col {
+      .feedback-two-col {
         grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <!-- Reading Progress Bar -->
+  <!-- Scroll Reading Progress Bar -->
   <div id="readingProgressBar"></div>
 
-  <!-- Top Red Bar Header (Robbar.in style) -->
-  <header class="top-header-bar">
-    <div class="header-shell">
-      <div class="brand-group">
-        <a href="/" class="brand-title">
-          FIELD NOTES<span class="brand-dot-pill">.in</span>
-        </a>
-        <span class="brand-tagline">রুচিশীল দর্শকের ঠিকানা · An Independent Journal of Visual Culture</span>
+  <!-- Header matching the original public site theme -->
+  <header class="article-site-header">
+    <div class="header-left">
+      <a class="wordmark" href="/" aria-label="Field Notes home">FIELD<br /><span>NOTES</span></a>
+      <div class="live-date-pill" id="liveDatePill">
+        <span class="live-pulse-dot"></span>
+        <span id="liveDayText">Tuesday</span> · <span id="liveDateText">10 November 2026</span>
+        <span id="liveClockText" style="font-family:monospace;font-size:11px;color:var(--muted);margin-left:4px;"></span>
       </div>
-
-      <div class="header-right">
-        <div class="live-date-strip" id="liveDateContainer">
-          <span class="live-dot"></span>
-          <span id="liveDayText">Tuesday</span>
-          <span>•</span>
-          <span id="liveDateText">10 November 2026</span>
-          <span>•</span>
-          <span id="liveClockText" style="font-family:monospace;font-weight:600">--:--:--</span>
-        </div>
-
-        <div class="header-social-search">
-          <div class="header-social-links">
-            <a href="javascript:void(0)" onclick="shareVlog('facebook')" class="social-btn" title="Share on Facebook">f</a>
-            <a href="javascript:void(0)" onclick="shareVlog('twitter')" class="social-btn" title="Share on X">𝕏</a>
-            <a href="javascript:void(0)" onclick="shareVlog('whatsapp')" class="social-btn" title="Share on WhatsApp">wa</a>
-          </div>
-          <div class="search-input-box">
-            <span class="search-icon">🔍</span>
-            <input type="search" id="quickSearchInput" placeholder="Enter search keyword here..." />
-          </div>
-        </div>
-      </div>
+    </div>
+    <div class="header-nav-right">
+      <nav class="main-nav" aria-label="Primary navigation" style="display:flex;gap:24px;font-size:13px;color:var(--muted)">
+        <a href="/#latest">Latest</a>
+        <a href="/#topics">Topics</a>
+        <a href="/#about">About</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+      <a href="/" class="back-home-button">← Back to Journal</a>
     </div>
   </header>
 
-  <!-- Sub-Navigation Bar (Black Menu) -->
-  <nav class="sub-navbar" aria-label="Article navigation">
-    <div class="nav-shell">
-      <div class="nav-links">
-        <a href="/" class="nav-link back-home-link">← Return to Journal Home</a>
-        <a href="/#latest" class="nav-link">Latest Films</a>
-        <a href="/#topics" class="nav-link">Places</a>
-        <a href="/#topics" class="nav-link">Craft</a>
-        <a href="/#topics" class="nav-link">Cinema</a>
-        <a href="/#about" class="nav-link">About Desk</a>
-        <a href="/contact.html" class="nav-link">Contact</a>
-      </div>
-      <span class="nav-badge-right">Field Notes Publication</span>
-    </div>
-  </nav>
-
   <!-- Breadcrumbs -->
-  <div class="breadcrumb-bar">
-    <div class="breadcrumb-shell">
-      <a href="/">FieldNotes.in</a>
-      <span class="breadcrumb-sep">›</span>
+  <div class="article-breadcrumbs-bar">
+    <div class="article-breadcrumbs-shell">
+      <a href="/">Field Notes</a>
+      <span>/</span>
       <span id="bcCategoryText">Journal</span>
-      <span class="breadcrumb-sep">›</span>
-      <span class="breadcrumb-current" id="bcTitleText">Loading story…</span>
+      <span>/</span>
+      <span class="breadcrumb-current-title" id="bcTitleText">Loading story…</span>
     </div>
   </div>
 
-  <!-- Editorial Hero Presentation (Matching Robbar.in Screenshot) -->
-  <section class="hero-presentation">
-    <div class="hero-shell">
-      <div class="hero-lead-col">
-        <span class="category-kicker" id="heroCategoryKicker">✦ Feature Story</span>
-        <h1 class="hero-title" id="heroVlogTitle">Loading story…</h1>
-        <p class="hero-excerpt" id="heroVlogExcerpt"></p>
+  <!-- Hero Presentation Section (Matching Field Notes Light Editorial Theme) -->
+  <section class="article-hero-block">
+    <div class="article-hero-shell">
+      <div class="hero-text-col">
+        <span class="article-eyebrow" id="heroCategoryKicker">✦ Published Film</span>
+        <h1 class="hero-article-title" id="heroVlogTitle">Loading vlog content…</h1>
+        <p class="hero-lead-excerpt" id="heroVlogExcerpt"></p>
         
-        <div class="hero-author-row">
-          <div class="author-circle" id="heroAuthorAvatar">FN</div>
-          <div class="author-meta-info">
-            <strong id="heroAuthorName">Field Notes Desk</strong>
-            <span id="heroAuthorMeta">Published Film · Independent Journal</span>
+        <!-- Author Profile Byline -->
+        <div class="hero-author-strip">
+          <div class="author-circle-avatar" id="heroAuthorAvatar">FN</div>
+          <div class="author-strip-info">
+            <span class="author-strip-name" id="heroAuthorName">Field Notes Desk</span>
+            <span class="author-strip-bio" id="heroAuthorBio">Author & Filmmaker</span>
+            <span class="author-strip-meta" id="heroPublishedMeta">Published in Field Notes Archive</span>
           </div>
         </div>
       </div>
 
+      <!-- Featured Visual Frame -->
       <div class="hero-visual-col">
-        <div class="hero-visual-frame" id="heroVisualFrame">
-          <img id="heroVisualImg" src="" alt="Story visual" class="hero-visual-img" style="display:none;" />
-          <span class="hero-visual-badge" id="heroVisualBadge">Featured Film</span>
-          <span class="hero-visual-watermark">Field Notes Journal</span>
+        <div class="hero-visual-card">
+          <div class="hero-visual-thumb" id="heroVisualThumb">
+            <span class="visual-category-badge" id="heroCategoryBadge">Places</span>
+          </div>
+          <div class="visual-caption-bar">
+            <span>Visual Story & Documentary</span>
+            <span id="heroDurationMeta">~3 min read</span>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Full Article Body -->
-  <main class="article-reading-section">
-    <div class="reading-shell">
-      <div class="article-meta-bar">
-        <div class="article-meta-left">
-          <span class="meta-pill" id="articleCategoryPill">Journal</span>
-          <span id="articleReadingTime">~3 min read</span>
+  <main class="article-reading-body">
+    <div class="article-reading-shell">
+      <div class="reading-meta-bar">
+        <div class="reading-meta-tags">
+          <span class="reading-tag-pill" id="articleCategoryTag">Journal</span>
+          <span id="articleReadingTimeText">~3 min read</span>
           <span>•</span>
-          <span id="articleWordCount">0 words</span>
+          <span id="articleWordCountText">0 words</span>
           <span>•</span>
-          <span id="articlePublishDate">Recent</span>
+          <span id="articlePublishDateText">Recent</span>
         </div>
-        <div class="share-pill-group">
-          <button type="button" class="share-pill-btn" onclick="copyArticleLink()">🔗 Copy Link</button>
-          <button type="button" class="share-pill-btn" onclick="shareVlog('whatsapp')">💬 WhatsApp</button>
-          <button type="button" class="share-pill-btn" onclick="window.print()">🖨️ Print Story</button>
+        <div class="reading-action-btns">
+          <button type="button" class="reading-action-btn" onclick="copyStoryLink()">🔗 Copy Link</button>
+          <button type="button" class="reading-action-btn" onclick="shareWhatsApp()">💬 WhatsApp</button>
+          <button type="button" class="reading-action-btn" onclick="window.print()">🖨️ Print Story</button>
         </div>
       </div>
 
-      <!-- Formatted Reading Canvas -->
-      <article class="article-body-content" id="articleBodyContainer">
+      <!-- Formatted Reading Body Canvas -->
+      <article class="formatted-article-body" id="articleBodyContainer">
         <p class="muted">Loading full article text…</p>
       </article>
 
-      <!-- Author Bio Box -->
-      <div class="author-card-box">
-        <div class="author-card-avatar" id="authorBoxAvatar">FN</div>
-        <div class="author-card-text">
-          <strong id="authorBoxName">Field Notes Editorial Desk</strong>
-          <p id="authorBoxBio">Observations, essays, and stories about visual culture and the world we share.</p>
+      <!-- Attached Document Section -->
+      <div class="attached-doc-card" id="attachedDocCard" style="display:none;">
+        <div class="attached-doc-info">
+          <strong>Original Document Attachment</strong>
+          <small id="attachedDocName">document.docx</small>
         </div>
+        <a id="attachedDocLink" href="#" download class="reading-action-btn" style="background:var(--white);">
+          📄 Download Original Document (.docx)
+        </a>
       </div>
     </div>
   </main>
 
-  <!-- Reader Dialogue & Reflections -->
-  <section class="dialogue-section" id="reflectionsSection">
-    <div class="dialogue-shell">
-      <div class="dialogue-header">
+  <!-- Reader Dialogue & Reflections Section -->
+  <section class="reflections-wrapper" id="reflectionsSection">
+    <div class="reflections-shell">
+      <div class="reflections-heading-row">
         <div>
-          <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);font-weight:700;margin-bottom:4px;">Reader Dialogue</p>
-          <h3>Reflections & Comments</h3>
+          <p class="article-eyebrow" style="margin-bottom:4px;">Reader Dialogue</p>
+          <h3>Reflections & Feedback</h3>
         </div>
-        <span class="dialogue-count-badge" id="reflectionsCountBadge">0 Reflections</span>
+        <span class="reflections-count-tag" id="reflectionsCountTag">0 Reflections</span>
       </div>
 
-      <!-- Reflection Submission Form -->
-      <div class="feedback-input-card">
-        <h4>Leave a reflection on this piece</h4>
+      <!-- Reflection Form -->
+      <div class="reflection-submit-box">
+        <h4>Leave a reflection on this film</h4>
         <form id="articleFeedbackForm">
-          <div class="form-two-col">
-            <input type="text" name="author_name" class="form-input" placeholder="Your name *" required minlength="2" />
-            <input type="email" name="author_email" class="form-input" placeholder="Your email address (optional)" />
+          <div class="feedback-two-col">
+            <input type="text" name="author_name" class="feedback-input" placeholder="Your name *" required minlength="2" />
+            <input type="email" name="author_email" class="feedback-input" placeholder="Your email address (optional)" />
           </div>
-          <textarea name="comment" class="form-textarea" placeholder="Share your reflection, interpretation, or thoughts on this film…" required minlength="3"></textarea>
+          <textarea name="comment" class="feedback-textarea" placeholder="Share your reflection, question, or response to this piece…" required minlength="3"></textarea>
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-            <button type="submit" class="submit-reflection-btn" id="feedbackSubmitBtn">
-              <span>Submit Reflection</span> <span>↗</span>
+            <button type="submit" class="submit-comment-button" id="feedbackSubmitBtn">
+              <span>Submit reflection</span> <span>↗</span>
             </button>
             <div id="feedbackFormStatus" style="font-size:12px;display:none;"></div>
           </div>
         </form>
       </div>
 
-      <!-- Published Reader Reflections Stream -->
-      <div class="reflections-stream" id="reflectionsList">
+      <!-- Reflections Stream -->
+      <div class="reflections-list-container" id="reflectionsListContainer">
         <p class="muted" style="text-align:center;padding:20px 0;">No reader reflections submitted yet. Be the first to share your thoughts.</p>
       </div>
     </div>
   </section>
 
-  <!-- More From Field Notes -->
-  <section class="more-stories-section">
-    <div class="more-shell">
-      <div class="more-header">
-        <p>Keep Exploring</p>
+  <!-- More Films From Field Notes -->
+  <section class="more-films-shelf">
+    <div class="more-films-shell">
+      <div class="more-films-header">
+        <p class="article-eyebrow">Explore the archive</p>
         <h3>More Stories from Field Notes</h3>
       </div>
-      <div class="more-grid" id="moreStoriesGrid">
-        <p class="muted">Loading more stories…</p>
+      <div class="more-films-grid" id="moreFilmsGrid">
+        <p class="muted">Loading more films…</p>
       </div>
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <div class="footer-shell">
-      <div class="footer-brand">FIELD NOTES<span style="color:var(--lime)">.in</span></div>
-      <span>An Independent Journal of Film, Art & Visual Culture</span>
-      <span>© 2026 FIELD NOTES. All rights reserved.</span>
-      <a href="/" style="color:var(--lime);font-weight:600">Return to Journal Home ↑</a>
+  <!-- Site Footer -->
+  <footer class="article-site-footer">
+    <div class="footer-shell-content">
+      <span>© 2026 FIELD NOTES</span>
+      <span>Made for curious minds</span>
+      <a href="/contact.html" style="color:var(--muted)">Contact us ↗</a>
+      <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;" style="color:var(--ink);font-weight:600">Back to top ↑</a>
     </div>
   </footer>
 
   <script>
-    // Live Date and Day Script (Matching Screenshot)
-    function updateLiveHeaderClock() {
+    // Live Date and Day Script
+    function updateLiveHeaderDate() {
       const now = new Date();
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1009,12 +857,10 @@
 
       if (dayEl) dayEl.textContent = dayName;
       if (dateEl) dateEl.textContent = `${dayNum} ${monthName} ${year}`;
-      if (clockEl) {
-        clockEl.textContent = now.toLocaleTimeString('en-US', { hour12: true });
-      }
+      if (clockEl) clockEl.textContent = now.toLocaleTimeString('en-US', { hour12: true });
     }
-    updateLiveHeaderClock();
-    setInterval(updateLiveHeaderClock, 1000);
+    updateLiveHeaderDate();
+    setInterval(updateLiveHeaderDate, 1000);
 
     // Reading Progress Bar
     window.addEventListener('scroll', () => {
@@ -1035,35 +881,80 @@
       return d.innerHTML;
     }
 
-    async function loadVlog() {
+    function formatDate(dateStr) {
+      if (!dateStr) return 'Recent';
+      try {
+        const safe = String(dateStr).replace(' ', 'T');
+        const d = new Date(safe);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+      } catch(e) {}
+      return String(dateStr).split(' ')[0] || 'Recent';
+    }
+
+    function formatBodyText(text, fallbackExcerpt = '') {
+      const content = (text && text.trim()) ? text : (fallbackExcerpt && fallbackExcerpt.trim() ? fallbackExcerpt : '');
+      if (!content) return '<p class="muted">No written content available for this film.</p>';
+      
+      // Normalize line breaks and split paragraphs
+      const rawParagraphs = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split(/\n+/);
+      const cleanParagraphs = rawParagraphs.map(p => p.trim()).filter(Boolean);
+      
+      if (!cleanParagraphs.length) {
+        return `<p>${esc(content)}</p>`;
+      }
+      return cleanParagraphs.map(p => `<p>${esc(p)}</p>`).join('');
+    }
+
+    async function loadVlogContent() {
       const params = new URLSearchParams(window.location.search);
       const requestedId = params.get('id');
 
+      // 1. Instant load from sessionStorage if passed from public site
+      try {
+        const cachedStr = sessionStorage.getItem('field_notes_selected_vlog');
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr);
+          if (!requestedId || String(cached.id) === requestedId || String(cached.title).toLowerCase() === decodeURIComponent(requestedId).toLowerCase()) {
+            currentVlog = cached;
+            renderVlogDetails(currentVlog);
+            loadFeedbackList(currentVlog);
+            startFeedbackPolling();
+          }
+        }
+      } catch(e) {}
+
+      // 2. Fetch fresh data from backend
       try {
         const res = await fetch('/api/vlogs');
-        if (!res.ok) throw new Error('Could not fetch vlogs');
+        if (!res.ok) throw new Error('Failed to fetch vlogs from server');
         allVlogs = await res.json();
 
-        if (!allVlogs || !allVlogs.length) {
-          document.querySelector('#heroVlogTitle').textContent = 'No published films found.';
-          document.querySelector('#articleBodyContainer').innerHTML = '<p class="muted">There are currently no published films available. Please check back soon.</p>';
+        if (!Array.isArray(allVlogs) || !allVlogs.length) {
+          if (!currentVlog) {
+            document.querySelector('#heroVlogTitle').textContent = 'No published films found.';
+            document.querySelector('#articleBodyContainer').innerHTML = '<p class="muted">There are currently no published films available.</p>';
+          }
           return;
         }
 
-        // Find vlog by ID or title slug
+        // Find the matching vlog
+        let matched = null;
         if (requestedId) {
-          currentVlog = allVlogs.find(v => String(v.id) === requestedId || String(v.title).toLowerCase() === decodeURIComponent(requestedId).toLowerCase());
+          matched = allVlogs.find(v => String(v.id) === requestedId || String(v.title).toLowerCase() === decodeURIComponent(requestedId).toLowerCase());
         }
-        if (!currentVlog) {
-          currentVlog = allVlogs[0];
+        if (!matched) {
+          matched = allVlogs[0];
         }
 
-        renderVlog(currentVlog);
-        renderMoreStories(currentVlog, allVlogs);
-        loadReflections(currentVlog);
+        currentVlog = matched;
+        renderVlogDetails(currentVlog);
+        renderMoreFilms(currentVlog, allVlogs);
+        loadFeedbackList(currentVlog);
         startFeedbackPolling();
 
-        // Track page view event
+        // Track click / view event
         try {
           fetch('/api/analytics/event', {
             method: 'POST',
@@ -1076,138 +967,134 @@
           }).catch(() => {});
         } catch(e) {}
       } catch (err) {
-        console.error('Error loading article:', err);
+        console.error('Error fetching vlog:', err);
       }
     }
 
-    function renderVlog(v) {
-      document.title = `${v.title} — Field Notes`;
+    function renderVlogDetails(v) {
+      if (!v) return;
+      document.title = `${v.title || 'Journal'} — Field Notes`;
+      
       const titleEl = document.querySelector('#heroVlogTitle');
       const excerptEl = document.querySelector('#heroVlogExcerpt');
       const bcCategory = document.querySelector('#bcCategoryText');
       const bcTitle = document.querySelector('#bcTitleText');
       const kicker = document.querySelector('#heroCategoryKicker');
-      const categoryPill = document.querySelector('#articleCategoryPill');
-      const badge = document.querySelector('#heroVisualBadge');
+      const catBadge = document.querySelector('#heroCategoryBadge');
+      const catTag = document.querySelector('#articleCategoryTag');
       
-      if (titleEl) titleEl.textContent = v.title;
-      if (excerptEl) excerptEl.textContent = v.excerpt;
-      if (bcCategory) bcCategory.textContent = v.category || 'Cinema';
-      if (bcTitle) bcTitle.textContent = v.title;
-      if (kicker) kicker.textContent = `✦ ${v.category || 'Cinema'}`;
-      if (categoryPill) categoryPill.textContent = v.category || 'Cinema';
-      if (badge) badge.textContent = v.category || 'Featured Film';
+      if (titleEl) titleEl.textContent = v.title || 'Untitled';
+      if (excerptEl) excerptEl.textContent = v.excerpt || '';
+      if (bcCategory) bcCategory.textContent = v.category || 'Journal';
+      if (bcTitle) bcTitle.textContent = v.title || 'Story';
+      if (kicker) kicker.textContent = `✦ ${v.category || 'Published Film'}`;
+      if (catBadge) catBadge.textContent = v.category || 'Places';
+      if (catTag) catTag.textContent = v.category || 'Journal';
 
-      // Author Info
+      // Author details
       const authorName = v.author || 'Field Notes';
       const authorInitials = authorName.split(' ').map(s=>s[0]).join('').slice(0, 2).toUpperCase() || 'FN';
       const heroAuthorName = document.querySelector('#heroAuthorName');
+      const heroAuthorBio = document.querySelector('#heroAuthorBio');
       const heroAuthorAvatar = document.querySelector('#heroAuthorAvatar');
-      const heroAuthorMeta = document.querySelector('#heroAuthorMeta');
-
-      const authorBoxName = document.querySelector('#authorBoxName');
-      const authorBoxAvatar = document.querySelector('#authorBoxAvatar');
-      const authorBoxBio = document.querySelector('#authorBoxBio');
+      const heroPublishedMeta = document.querySelector('#heroPublishedMeta');
 
       if (heroAuthorName) heroAuthorName.textContent = authorName;
-      if (authorBoxName) authorBoxName.textContent = authorName;
-
-      const dateStr = v.created_at ? String(v.created_at).split(' ')[0] : 'Recent';
-      if (heroAuthorMeta) heroAuthorMeta.textContent = `Published on ${dateStr} · Independent Journal`;
-
-      if (authorBoxBio) {
-        authorBoxBio.textContent = v.author_bio || 'A contributor to Field Notes journal of film, observation, and visual storytelling.';
+      if (heroAuthorBio) {
+        heroAuthorBio.textContent = v.author_bio || 'Contributor to the Field Notes archive of film & visual storytelling.';
       }
 
+      const formattedPubDate = formatDate(v.created_at);
+      if (heroPublishedMeta) {
+        heroPublishedMeta.textContent = `Published on ${formattedPubDate} · Field Notes Journal`;
+      }
+
+      // Author Picture
       if (v.author_image_filename) {
         const imgUrl = `/uploads/${encodeURIComponent(v.author_image_filename)}`;
         if (heroAuthorAvatar) {
           heroAuthorAvatar.style.backgroundImage = `url('${imgUrl}')`;
           heroAuthorAvatar.textContent = '';
         }
-        if (authorBoxAvatar) {
-          authorBoxAvatar.style.backgroundImage = `url('${imgUrl}')`;
-          authorBoxAvatar.textContent = '';
-        }
       } else {
         if (heroAuthorAvatar) {
           heroAuthorAvatar.style.backgroundImage = 'none';
           heroAuthorAvatar.textContent = authorInitials;
         }
-        if (authorBoxAvatar) {
-          authorBoxAvatar.style.backgroundImage = 'none';
-          authorBoxAvatar.textContent = authorInitials;
+      }
+
+      // Featured Visual / Thumbnail Image
+      const visualThumb = document.querySelector('#heroVisualThumb');
+      if (visualThumb) {
+        if (v.thumbnail_filename) {
+          visualThumb.style.backgroundImage = `url('/uploads/${encodeURIComponent(v.thumbnail_filename)}')`;
+        } else {
+          visualThumb.style.background = 'linear-gradient(135deg, #76806a, #b4a37e 48%, #383e33)';
         }
       }
 
-      // Visual / Thumbnail
-      const heroImg = document.querySelector('#heroVisualImg');
-      const heroFrame = document.querySelector('#heroVisualFrame');
-      if (v.thumbnail_filename) {
-        const thumbUrl = `/uploads/${encodeURIComponent(v.thumbnail_filename)}`;
-        if (heroImg) {
-          heroImg.src = thumbUrl;
-          heroImg.style.display = 'block';
-        }
-      } else {
-        if (heroImg) heroImg.style.display = 'none';
-        if (heroFrame) {
-          heroFrame.style.background = 'linear-gradient(135deg, #301015, #85101b 50%, #151614)';
-        }
-      }
-
-      // Word count & Reading Time
+      // Word count, Reading Length, Publication Date
       const wc = v.word_count || 1;
       const mins = Math.max(1, Math.ceil(wc / 200));
-      const wcEl = document.querySelector('#articleWordCount');
-      const rtEl = document.querySelector('#articleReadingTime');
-      const pdEl = document.querySelector('#articlePublishDate');
+      const rtText = document.querySelector('#articleReadingTimeText');
+      const wcText = document.querySelector('#articleWordCountText');
+      const pdText = document.querySelector('#articlePublishDateText');
+      const durationMeta = document.querySelector('#heroDurationMeta');
 
-      if (wcEl) wcEl.textContent = `${wc.toLocaleString()} words`;
-      if (rtEl) rtEl.textContent = `~${mins} min read`;
-      if (pdEl) pdEl.textContent = dateStr;
+      if (rtText) rtText.textContent = `~${mins} min read`;
+      if (wcText) wcText.textContent = `${wc.toLocaleString()} words`;
+      if (pdText) pdText.textContent = formattedPubDate;
+      if (durationMeta) durationMeta.textContent = `~${mins} min read (${wc.toLocaleString()} words)`;
 
-      // Article Body Content
+      // Article Full Content
       const bodyContainer = document.querySelector('#articleBodyContainer');
       if (bodyContainer) {
-        if (v.body_text && v.body_text.trim()) {
-          const paras = v.body_text.split(/\n\n+/).filter(Boolean);
-          bodyContainer.innerHTML = paras.map(p => `<p>${esc(p)}</p>`).join('');
-        } else {
-          bodyContainer.innerHTML = `<p>${esc(v.excerpt || 'No full transcript available for this visual film.')}</p>`;
-        }
+        bodyContainer.innerHTML = formatBodyText(v.body_text, v.excerpt);
+      }
+
+      // Attached Document
+      const docCard = document.querySelector('#attachedDocCard');
+      const docName = document.querySelector('#attachedDocName');
+      const docLink = document.querySelector('#attachedDocLink');
+      if (v.filename) {
+        if (docCard) docCard.style.display = 'flex';
+        if (docName) docName.textContent = v.filename;
+        if (docLink) docLink.href = `/uploads/${encodeURIComponent(v.filename)}`;
+      } else {
+        if (docCard) docCard.style.display = 'none';
       }
     }
 
-    function renderMoreStories(current, list) {
-      const grid = document.querySelector('#moreStoriesGrid');
+    function renderMoreFilms(current, list) {
+      const grid = document.querySelector('#moreFilmsGrid');
       if (!grid) return;
       const others = list.filter(v => v.id !== current.id).slice(0, 3);
       if (!others.length) {
-        grid.innerHTML = '<p class="muted">No other published films at this time.</p>';
+        grid.innerHTML = '<p class="muted">No other published films in the archive yet.</p>';
         return;
       }
       grid.innerHTML = others.map(v => {
         const thumbStyle = v.thumbnail_filename
           ? `style="background-image:url('/uploads/${encodeURIComponent(v.thumbnail_filename)}')"`
-          : 'style="background:linear-gradient(135deg,#301015,#85101b)"';
+          : 'style="background:linear-gradient(135deg,#76806a,#b4a37e)"';
         return `
-          <div class="more-card" onclick="window.location.href='/vlog.html?id=${v.id}'">
-            <div class="more-thumb" ${thumbStyle}></div>
-            <div class="more-card-content">
-              <span class="more-card-category">${esc(v.category || 'Film')}</span>
-              <h4 class="more-card-title">${esc(v.title)}</h4>
-              <p class="more-card-excerpt">${esc(v.excerpt)}</p>
+          <a class="more-vlog-item" href="/vlog.html?id=${v.id}">
+            <div class="more-vlog-thumb" ${thumbStyle}></div>
+            <div class="more-vlog-meta">
+              <span>${esc(v.category || 'Film')}</span>
+              <span>${formatDate(v.created_at)}</span>
             </div>
-          </div>
+            <h4 class="more-vlog-title">${esc(v.title)}</h4>
+            <p class="more-vlog-excerpt">${esc(v.excerpt)}</p>
+          </a>
         `;
       }).join('');
     }
 
-    async function loadReflections(vlog) {
+    async function loadFeedbackList(vlog) {
       if (!vlog) return;
-      const listEl = document.querySelector('#reflectionsList');
-      const countBadge = document.querySelector('#reflectionsCountBadge');
+      const listEl = document.querySelector('#reflectionsListContainer');
+      const countTag = document.querySelector('#reflectionsCountTag');
       if (!listEl) return;
 
       try {
@@ -1217,8 +1104,8 @@
         const items = await res.json();
         const count = items.length;
 
-        if (countBadge) {
-          countBadge.textContent = `${count} ${count === 1 ? 'Reflection' : 'Reflections'}`;
+        if (countTag) {
+          countTag.textContent = `${count} ${count === 1 ? 'Reflection' : 'Reflections'}`;
         }
 
         if (!items || !items.length) {
@@ -1227,12 +1114,12 @@
         }
 
         listEl.innerHTML = items.map(fb => `
-          <div class="reflection-item">
-            <div class="reflection-meta">
-              <span class="reflection-author">${esc(fb.author_name)}</span>
-              <span class="reflection-date">${esc(String(fb.created_at || '').split(' ')[0] || 'Recent')}</span>
+          <div class="reflection-card-item">
+            <div class="reflection-card-meta">
+              <strong>${esc(fb.author_name)}</strong>
+              <small>${esc(formatDate(fb.created_at))}</small>
             </div>
-            <p class="reflection-body">${esc(fb.comment)}</p>
+            <p class="reflection-card-comment">${esc(fb.comment)}</p>
           </div>
         `).join('');
       } catch(e) {}
@@ -1242,7 +1129,7 @@
       stopFeedbackPolling();
       feedbackPollTimer = setInterval(() => {
         if (currentVlog && !document.hidden) {
-          loadReflections(currentVlog);
+          loadFeedbackList(currentVlog);
         }
       }, 2000);
     }
@@ -1254,8 +1141,8 @@
       }
     }
 
-    // Handle Feedback Form Submission
-    const feedbackForm = document.querySelector('#articleFeedbackForm');
+    // Submit Reflection Form
+    const feedbackForm = document.querySelector('#articleFeedbackForm') || document.querySelector('#vlogFeedbackForm');
     if (feedbackForm) {
       feedbackForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1266,7 +1153,8 @@
 
         if (btn) {
           btn.disabled = true;
-          btn.innerHTML = '<span>Submitting…</span>';
+          btn.style.opacity = '0.6';
+          btn.querySelector('span:first-child').textContent = 'Submitting…';
         }
         if (status) {
           status.style.display = 'block';
@@ -1293,10 +1181,10 @@
 
           feedbackForm.reset();
           if (status) {
-            status.style.color = '#2d6a1e';
+            status.style.color = '#5c751f';
             status.textContent = '✓ Thank you! Your reflection has been published.';
           }
-          loadReflections(currentVlog);
+          loadFeedbackList(currentVlog);
         } catch (err) {
           if (status) {
             status.style.color = '#b43434';
@@ -1305,53 +1193,29 @@
         } finally {
           if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span>Submit Reflection</span> <span>↗</span>';
+            btn.style.opacity = '1';
+            btn.querySelector('span:first-child').textContent = 'Submit reflection';
           }
         }
       });
     }
 
-    // Quick Search Input
-    const quickSearchInput = document.querySelector('#quickSearchInput');
-    if (quickSearchInput) {
-      quickSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          const q = quickSearchInput.value.trim().toLowerCase();
-          if (!q) return;
-          const match = allVlogs.find(v => (v.title || '').toLowerCase().includes(q) || (v.category || '').toLowerCase().includes(q) || (v.author || '').toLowerCase().includes(q));
-          if (match) {
-            window.location.href = `/vlog.html?id=${match.id}`;
-          } else {
-            alert('No matching articles found for "' + q + '". Redirecting to journal archives.');
-            window.location.href = '/';
-          }
-        }
-      });
-    }
-
-    // Share Helpers
-    function shareVlog(platform) {
+    function shareWhatsApp() {
       const url = encodeURIComponent(window.location.href);
       const title = encodeURIComponent(document.title);
-      if (platform === 'twitter') {
-        window.open(`https://twitter.com/intent/tweet?url=${url}&text=${title}`, '_blank');
-      } else if (platform === 'facebook') {
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
-      } else if (platform === 'whatsapp') {
-        window.open(`https://api.whatsapp.com/send?text=${title}%20${url}`, '_blank');
-      }
+      window.open(`https://api.whatsapp.com/send?text=${title}%20${url}`, '_blank');
     }
 
-    function copyArticleLink() {
+    function copyStoryLink() {
       navigator.clipboard.writeText(window.location.href).then(() => {
-        alert('Article link copied to clipboard!');
+        alert('Story link copied to clipboard!');
       }).catch(() => {
-        prompt('Copy this link:', window.location.href);
+        prompt('Copy this story link:', window.location.href);
       });
     }
 
-    // Initialize
-    loadVlog();
+    // Initialize Page
+    loadVlogContent();
   </script>
 </body>
 </html>
