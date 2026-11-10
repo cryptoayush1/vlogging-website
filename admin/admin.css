@@ -155,3 +155,31 @@ input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 
 #docPreviewVisual li{margin-bottom:4px}
 #docPreviewVisual a{color:var(--blue);text-decoration:underline}
 
+/* Picture Format Toolbar (MS Word Tools) */
+.picture-toolbar{background:#f1f4e6;border:1px solid #7e8838;border-top:none;padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;transition:all .2s ease}
+.picture-toolbar.hidden{display:none!important}
+.picture-tool-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#3b4412;background:var(--lime);padding:3px 8px;border-radius:3px;border:1px solid #7e8838;display:inline-flex;align-items:center}
+.picture-tool-group{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.picture-group-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#555b23;margin-right:2px}
+.pic-tool-btn{background:#fff;border:1px solid #c2c99a;border-radius:3px;height:28px;min-width:28px;padding:0 8px;font-size:11px;font-weight:600;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .15s ease;user-select:none}
+.pic-tool-btn:hover{background:#e4ecb8;border-color:#5c751f;color:#000}
+.pic-tool-btn.is-active{background:#5c751f;color:#fff;border-color:#3b4412}
+.pic-tool-btn.pic-delete-btn{color:#b43434;border-color:#e5b2b2}
+.pic-tool-btn.pic-delete-btn:hover{background:#b43434;color:#fff;border-color:#8c1e1e}
+.pic-tool-btn.pic-done-btn{background:#20221f;color:#fff;border-color:#20221f;margin-left:auto}
+.pic-tool-btn.pic-done-btn:hover{background:#3b4412}
+.picture-slider-wrap{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--ink);background:#fff;border:1px solid #c2c99a;border-radius:3px;padding:0 6px;height:28px}
+.picture-slider-wrap input[type="range"]{width:70px;height:4px;accent-color:#5c751f;cursor:pointer}
+
+/* Floating Image Resize Handles Overlay */
+.img-resize-overlay{box-shadow:0 0 0 1px rgba(255,255,255,.8),0 4px 16px rgba(0,0,0,.2);border-radius:2px}
+.resize-handle{position:absolute;width:10px;height:10px;background:#5c751f;border:2px solid #fff;border-radius:2px;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:102}
+.handle-nw{top:-6px;left:-6px;cursor:nwse-resize}
+.handle-ne{top:-6px;right:-6px;cursor:nesw-resize}
+.handle-se{bottom:-6px;right:-6px;cursor:nwse-resize}
+.handle-sw{bottom:-6px;left:-6px;cursor:nesw-resize}
+.resize-dim-badge{position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);background:#20221f;color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap;pointer-events:none;letter-spacing:.02em}
+#docPreviewVisual img{cursor:pointer;transition:outline .15s ease}
+#docPreviewVisual img:hover{outline:2px dashed #5c751f;outline-offset:2px}
+
+

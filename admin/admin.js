@@ -592,8 +592,6 @@ const editorFontFamily=document.querySelector('#editorFontFamily');
 const editorFontSize=document.querySelector('#editorFontSize');
 const editorImageInput=document.querySelector('#editorImageInput');
 const btnInsertPhoto=document.querySelector('#btnInsertPhoto');
-const btnToggleSource=document.querySelector('#btnToggleSource');
-let isSourceView=false;
 
 function countWords(str){
   if(!str||!str.trim()) return 0;
@@ -605,15 +603,12 @@ function countWords(str){
 
 function syncVisualToText(){
   if(!docPreviewVisual || !docPreviewText) return;
-  if(!isSourceView){
-    docPreviewText.value = docPreviewVisual.innerHTML;
-  } else {
-    docPreviewVisual.innerHTML = docPreviewText.value;
-  }
+  docPreviewText.value = docPreviewVisual.innerHTML;
   updateDocPreviewWordCount();
 }
 
 function setPreviewContent(content){
+  deselectEditorImage();
   if(!content){
     if(docPreviewVisual) docPreviewVisual.innerHTML='';
     if(docPreviewText) docPreviewText.value='';
@@ -649,23 +644,11 @@ if(docPreviewVisual){
   docPreviewVisual.addEventListener('input', syncVisualToText);
   docPreviewVisual.addEventListener('blur', syncVisualToText);
 }
-if(docPreviewText){
-  docPreviewText.addEventListener('input', ()=>{
-    if(isSourceView && docPreviewVisual){
-      docPreviewVisual.innerHTML = docPreviewText.value;
-    }
-    updateDocPreviewWordCount();
-  });
-}
 
 // Formatting Toolbar Action Handlers (Bold, Italics, Underline, Justification, Lists)
 document.querySelectorAll('.editor-tool-btn[data-cmd]').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.preventDefault();
-    if(isSourceView){
-      alert('Please switch back to Visual mode to apply rich formatting.');
-      return;
-    }
     if(!docPreviewVisual) return;
     docPreviewVisual.focus();
     const cmd = btn.dataset.cmd;
@@ -679,10 +662,6 @@ const btnLink = document.querySelector('#btnLink');
 if(btnLink){
   btnLink.addEventListener('click', (e) => {
     e.preventDefault();
-    if(isSourceView){
-      alert('Please switch back to Visual mode to apply links.');
-      return;
-    }
     if(!docPreviewVisual) return;
     docPreviewVisual.focus();
     const url = prompt('Enter link destination URL (e.g. https://example.com):', 'https://');
@@ -696,7 +675,6 @@ if(btnLink){
 // Font Size Handler
 if(editorFontSize){
   editorFontSize.addEventListener('change', () => {
-    if(isSourceView) return;
     const size = editorFontSize.value;
     if(!size || !docPreviewVisual) return;
     docPreviewVisual.focus();
@@ -729,10 +707,6 @@ if(editorFontFamily){
 if(btnInsertPhoto && editorImageInput){
   btnInsertPhoto.addEventListener('click', (e) => {
     e.preventDefault();
-    if(isSourceView){
-      alert('Please switch back to Visual mode to insert photos.');
-      return;
-    }
     editorImageInput.click();
   });
 
@@ -791,31 +765,373 @@ if(btnInsertPhoto && editorImageInput){
   });
 }
 
-// Toggle Visual / Source View
-if(btnToggleSource){
-  btnToggleSource.addEventListener('click', (e) => {
-    e.preventDefault();
-    isSourceView = !isSourceView;
-    if(isSourceView){
-      if(docPreviewText && docPreviewVisual){
-        docPreviewText.value = docPreviewVisual.innerHTML;
-        docPreviewVisual.style.display = 'none';
-        docPreviewText.style.display = 'block';
-        docPreviewText.focus();
-      }
-      btnToggleSource.textContent = '👁 Visual View';
-      btnToggleSource.style.background = 'var(--lime)';
-    } else {
-      if(docPreviewText && docPreviewVisual){
-        docPreviewVisual.innerHTML = docPreviewText.value;
-        docPreviewText.style.display = 'none';
-        docPreviewVisual.style.display = 'block';
-        docPreviewVisual.focus();
-      }
-      btnToggleSource.textContent = '</> Source';
-      btnToggleSource.style.background = '#fff';
+// ==========================================
+// MICROSOFT WORD-STYLE PICTURE TOOLS & RESIZER
+// ==========================================
+const pictureToolbar = document.querySelector('#pictureToolbar');
+const picWidthSlider = document.querySelector('#picWidthSlider');
+const picWidthLabel = document.querySelector('#picWidthLabel');
+const picStyleSelect = document.querySelector('#picStyleSelect');
+const btnPicResetSize = document.querySelector('#btnPicResetSize');
+const btnPicCaption = document.querySelector('#btnPicCaption');
+const btnPicReplace = document.querySelector('#btnPicReplace');
+const btnPicDelete = document.querySelector('#btnPicDelete');
+const btnPicDone = document.querySelector('#btnPicDone');
+const replaceImageInput = document.querySelector('#replaceImageInput');
+const imgResizeOverlay = document.querySelector('#imgResizeOverlay');
+const resizeDimBadge = document.querySelector('#resizeDimBadge');
+
+let activeSelectedImg = null;
+let isDraggingResize = false;
+
+function positionImageOverlay(img) {
+  if (!img || !imgResizeOverlay || !docPreviewVisual) return;
+  const containerRect = docPreviewVisual.parentElement.getBoundingClientRect();
+  const imgRect = img.getBoundingClientRect();
+
+  const top = (imgRect.top - containerRect.top);
+  const left = (imgRect.left - containerRect.left);
+
+  imgResizeOverlay.style.top = `${top}px`;
+  imgResizeOverlay.style.left = `${left}px`;
+  imgResizeOverlay.style.width = `${imgRect.width}px`;
+  imgResizeOverlay.style.height = `${imgRect.height}px`;
+  imgResizeOverlay.classList.remove('hidden');
+
+  const parentWidth = Math.max(100, docPreviewVisual.clientWidth - 32);
+  const pct = Math.min(100, Math.max(10, Math.round((imgRect.width / parentWidth) * 100)));
+  if (resizeDimBadge) {
+    resizeDimBadge.textContent = `${Math.round(imgRect.width)}px · ${pct}%`;
+  }
+  if (picWidthSlider) picWidthSlider.value = pct;
+  if (picWidthLabel) picWidthLabel.textContent = `${pct}%`;
+}
+
+function selectEditorImage(img) {
+  if (!img) return;
+  activeSelectedImg = img;
+  if (pictureToolbar) pictureToolbar.classList.remove('hidden');
+  positionImageOverlay(img);
+
+  const fig = img.closest('figure');
+  const targetEl = fig || img;
+  const curFloat = targetEl.style.float || 'none';
+  const curDisplay = targetEl.style.display || '';
+
+  document.querySelectorAll('[data-img-wrap]').forEach(btn => {
+    const wrap = btn.dataset.imgWrap;
+    let isActive = false;
+    if (wrap === 'left' && curFloat === 'left') isActive = true;
+    else if (wrap === 'right' && curFloat === 'right') isActive = true;
+    else if (wrap === 'center' && (curFloat === 'none' || !curFloat) && (targetEl.style.margin && targetEl.style.margin.includes('auto'))) isActive = true;
+    else if (wrap === 'inline' && curDisplay.includes('inline')) isActive = true;
+    btn.classList.toggle('is-active', isActive);
+  });
+}
+
+function deselectEditorImage() {
+  activeSelectedImg = null;
+  if (imgResizeOverlay) imgResizeOverlay.classList.add('hidden');
+  if (pictureToolbar) pictureToolbar.classList.add('hidden');
+  document.querySelectorAll('[data-img-size]').forEach(b => b.classList.remove('is-active'));
+  document.querySelectorAll('[data-img-wrap]').forEach(b => b.classList.remove('is-active'));
+}
+
+if (docPreviewVisual) {
+  docPreviewVisual.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (img && docPreviewVisual.contains(img)) {
+      e.stopPropagation();
+      selectEditorImage(img);
+    } else if (!isDraggingResize) {
+      deselectEditorImage();
     }
-    updateDocPreviewWordCount();
+  });
+
+  docPreviewVisual.addEventListener('scroll', () => {
+    if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
+  });
+}
+
+window.addEventListener('resize', () => {
+  if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
+});
+
+function setImageSize(widthVal) {
+  if (!activeSelectedImg) return;
+  const fig = activeSelectedImg.closest('figure');
+  const widthStr = typeof widthVal === 'number' ? `${widthVal}%` : String(widthVal);
+
+  activeSelectedImg.style.width = widthStr;
+  activeSelectedImg.style.maxWidth = '100%';
+  activeSelectedImg.style.height = 'auto';
+
+  if (fig) {
+    fig.style.width = widthStr;
+    fig.style.maxWidth = '100%';
+  }
+
+  positionImageOverlay(activeSelectedImg);
+  syncVisualToText();
+}
+
+document.querySelectorAll('[data-img-size]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    const size = btn.dataset.imgSize;
+    setImageSize(size);
+    document.querySelectorAll('[data-img-size]').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+  });
+});
+
+if (picWidthSlider) {
+  picWidthSlider.addEventListener('input', () => {
+    if (!activeSelectedImg) return;
+    const val = picWidthSlider.value;
+    setImageSize(val);
+    if (picWidthLabel) picWidthLabel.textContent = `${val}%`;
+  });
+}
+
+if (btnPicResetSize) {
+  btnPicResetSize.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    setImageSize('100%');
+  });
+}
+
+document.querySelectorAll('[data-img-wrap]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    const wrap = btn.dataset.imgWrap;
+    const fig = activeSelectedImg.closest('figure');
+    const target = fig || activeSelectedImg;
+
+    if (wrap === 'left') {
+      target.style.float = 'left';
+      target.style.margin = '10px 20px 14px 0';
+      target.style.clear = 'left';
+      target.style.display = 'block';
+      target.style.textAlign = 'left';
+    } else if (wrap === 'center') {
+      target.style.float = 'none';
+      target.style.margin = '20px auto';
+      target.style.clear = 'both';
+      target.style.display = 'block';
+      target.style.textAlign = 'center';
+    } else if (wrap === 'right') {
+      target.style.float = 'right';
+      target.style.margin = '10px 0 14px 20px';
+      target.style.clear = 'right';
+      target.style.display = 'block';
+      target.style.textAlign = 'right';
+    } else if (wrap === 'inline') {
+      target.style.float = 'none';
+      target.style.margin = '6px 12px';
+      target.style.clear = 'none';
+      target.style.display = 'inline-block';
+      target.style.verticalAlign = 'middle';
+    }
+
+    document.querySelectorAll('[data-img-wrap]').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+
+    positionImageOverlay(activeSelectedImg);
+    syncVisualToText();
+  });
+});
+
+if (picStyleSelect) {
+  picStyleSelect.addEventListener('change', () => {
+    if (!activeSelectedImg) return;
+    const style = picStyleSelect.value;
+    const img = activeSelectedImg;
+
+    img.style.borderRadius = '';
+    img.style.boxShadow = '';
+    img.style.border = '';
+    img.style.padding = '';
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.style.objectFit = '';
+
+    if (style === 'rounded') {
+      img.style.borderRadius = '12px';
+    } else if (style === 'shadow') {
+      img.style.borderRadius = '4px';
+      img.style.boxShadow = '0 10px 28px rgba(0,0,0,0.18)';
+    } else if (style === 'frame') {
+      img.style.borderRadius = '2px';
+      img.style.border = '3px solid #20221f';
+    } else if (style === 'matte') {
+      img.style.borderRadius = '2px';
+      img.style.padding = '8px';
+      img.style.background = '#ffffff';
+      img.style.border = '1px solid #d8dad2';
+      img.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)';
+    } else if (style === 'circle') {
+      img.style.borderRadius = '50%';
+      img.style.aspectRatio = '1 / 1';
+      img.style.objectFit = 'cover';
+    }
+
+    positionImageOverlay(activeSelectedImg);
+    syncVisualToText();
+  });
+}
+
+if (btnPicCaption) {
+  btnPicCaption.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    let fig = activeSelectedImg.closest('figure');
+    if (!fig) {
+      fig = document.createElement('figure');
+      fig.style.margin = '20px auto';
+      fig.style.textAlign = 'center';
+      activeSelectedImg.parentNode.insertBefore(fig, activeSelectedImg);
+      fig.appendChild(activeSelectedImg);
+    }
+
+    let captionEl = fig.querySelector('figcaption');
+    const currentCaption = captionEl ? captionEl.textContent.trim() : '';
+    const newCaption = prompt('Enter or edit image caption (leave empty to remove):', currentCaption);
+
+    if (newCaption === null) return;
+    if (newCaption.trim()) {
+      if (!captionEl) {
+        captionEl = document.createElement('figcaption');
+        captionEl.style.fontSize = '12px';
+        captionEl.style.color = 'var(--muted)';
+        captionEl.style.fontStyle = 'italic';
+        captionEl.style.marginTop = '6px';
+        fig.appendChild(captionEl);
+      }
+      captionEl.textContent = newCaption.trim();
+    } else {
+      if (captionEl) captionEl.remove();
+    }
+
+    positionImageOverlay(activeSelectedImg);
+    syncVisualToText();
+  });
+}
+
+if (btnPicReplace && replaceImageInput) {
+  btnPicReplace.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    replaceImageInput.click();
+  });
+
+  replaceImageInput.addEventListener('change', async () => {
+    const file = replaceImageInput.files[0];
+    if (!file || !activeSelectedImg) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Selected replacement photo exceeds the 5 MB limit.');
+      replaceImageInput.value = '';
+      return;
+    }
+
+    btnPicReplace.innerHTML = 'Replacing… <span>⏳</span>';
+    try {
+      let newUrl = '';
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const res = await api('/api/admin/vlogs/upload-body-image', { method: 'POST', body: fd });
+        if (res && res.url) newUrl = res.url;
+      } catch(err) {
+        newUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (newUrl && activeSelectedImg) {
+        activeSelectedImg.src = newUrl;
+        positionImageOverlay(activeSelectedImg);
+        syncVisualToText();
+      }
+    } catch(err) {
+      alert('Failed to replace picture: ' + err.message);
+    } finally {
+      btnPicReplace.innerHTML = '🔄 Replace';
+      replaceImageInput.value = '';
+    }
+  });
+}
+
+if (btnPicDelete) {
+  btnPicDelete.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!activeSelectedImg) return;
+    if (!confirm('Remove this photo from the vlog?')) return;
+    const fig = activeSelectedImg.closest('figure');
+    if (fig) fig.remove();
+    else activeSelectedImg.remove();
+    deselectEditorImage();
+    syncVisualToText();
+  });
+}
+
+if (btnPicDone) {
+  btnPicDone.addEventListener('click', (e) => {
+    e.preventDefault();
+    deselectEditorImage();
+  });
+}
+
+if (imgResizeOverlay) {
+  imgResizeOverlay.querySelectorAll('.resize-handle').forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!activeSelectedImg) return;
+
+      isDraggingResize = true;
+      const startX = e.clientX;
+      const startWidth = activeSelectedImg.getBoundingClientRect().width;
+      const handleType = handle.dataset.handle;
+      const parentWidth = Math.max(100, docPreviewVisual.clientWidth - 32);
+
+      function onMouseMove(moveEvent) {
+        if (!isDraggingResize || !activeSelectedImg) return;
+        const deltaX = moveEvent.clientX - startX;
+        let newPx = startWidth;
+
+        if (handleType === 'se' || handleType === 'ne') {
+          newPx = startWidth + deltaX;
+        } else {
+          newPx = startWidth - deltaX;
+        }
+
+        newPx = Math.max(60, Math.min(newPx, parentWidth));
+        const newPct = Math.min(100, Math.max(10, Math.round((newPx / parentWidth) * 100)));
+
+        setImageSize(`${newPct}%`);
+        if (resizeDimBadge) resizeDimBadge.textContent = `${Math.round(newPx)}px · ${newPct}%`;
+        if (picWidthSlider) picWidthSlider.value = newPct;
+        if (picWidthLabel) picWidthLabel.textContent = `${newPct}%`;
+      }
+
+      function onMouseUp() {
+        isDraggingResize = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        if (activeSelectedImg) positionImageOverlay(activeSelectedImg);
+        syncVisualToText();
+      }
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   });
 }
 

@@ -129,24 +129,88 @@
                     📷 Insert Photo
                   </button>
                   <input type="file" id="editorImageInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;">
-
-                  <!-- Toggle Source Code -->
-                  <button type="button" class="editor-tool-btn" id="btnToggleSource" title="Toggle HTML source code" style="margin-left:auto;">
-                    &lt;/&gt; Source
-                  </button>
                 </div>
 
-                <!-- Visual WYSIWYG Editable Box -->
-                <div id="docPreviewVisual" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true"
-                     placeholder="Document preview will appear here once selected. You can format text, add bullets, align paragraphs, and insert photos."
-                     style="resize:both;min-height:160px;min-width:200px;max-width:100%;line-height:1.75;outline:none;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;padding:14px 16px;overflow-y:auto;font-family:inherit;">
+                <!-- Microsoft Word-Style Picture Format Toolbar (active when an image is selected) -->
+                <div class="picture-toolbar hidden" id="pictureToolbar" role="toolbar" aria-label="Picture Tools">
+                  <div class="picture-tool-badge">
+                    <span>🖼️ Picture Format</span>
+                  </div>
+
+                  <!-- Resize presets -->
+                  <div class="picture-tool-group">
+                    <span class="picture-group-label">Resize</span>
+                    <button type="button" class="pic-tool-btn" data-img-size="25%" title="Resize to 25% width">25%</button>
+                    <button type="button" class="pic-tool-btn" data-img-size="50%" title="Resize to 50% width">50%</button>
+                    <button type="button" class="pic-tool-btn" data-img-size="75%" title="Resize to 75% width">75%</button>
+                    <button type="button" class="pic-tool-btn" data-img-size="100%" title="Resize to 100% full width">100%</button>
+                    <label class="picture-slider-wrap" title="Drag to resize image width">
+                      <input type="range" id="picWidthSlider" min="15" max="100" value="100" step="5">
+                      <span id="picWidthLabel">100%</span>
+                    </label>
+                    <button type="button" class="pic-tool-btn" id="btnPicResetSize" title="Reset to natural size">↺ Reset</button>
+                  </div>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Text Wrapping / Position (Word Wrap Text) -->
+                  <div class="picture-tool-group">
+                    <span class="picture-group-label">Wrap Text</span>
+                    <button type="button" class="pic-tool-btn" data-img-wrap="left" title="Square Left (Text wraps around right)">⇤ Left</button>
+                    <button type="button" class="pic-tool-btn" data-img-wrap="center" title="Top & Bottom Center (No text wrap)">↔ Center</button>
+                    <button type="button" class="pic-tool-btn" data-img-wrap="right" title="Square Right (Text wraps around left)">⇥ Right</button>
+                    <button type="button" class="pic-tool-btn" data-img-wrap="inline" title="In Line with Text">☰ Inline</button>
+                  </div>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Picture Styles (Word Picture Styles) -->
+                  <div class="picture-tool-group">
+                    <span class="picture-group-label">Picture Styles</span>
+                    <select class="editor-tool-select" id="picStyleSelect" title="Word Picture Styles">
+                      <option value="clean">Style: Clean / Flat</option>
+                      <option value="rounded">Rounded Corners</option>
+                      <option value="shadow">Soft Drop Shadow</option>
+                      <option value="frame">Solid Border Frame</option>
+                      <option value="matte">Photo Matte / Border</option>
+                      <option value="circle">Oval / Circle</option>
+                    </select>
+                  </div>
+
+                  <div class="editor-divider"></div>
+
+                  <!-- Caption & Operations -->
+                  <div class="picture-tool-group">
+                    <button type="button" class="pic-tool-btn" id="btnPicCaption" title="Edit or add image caption">✎ Caption</button>
+                    <button type="button" class="pic-tool-btn" id="btnPicReplace" title="Replace picture with another file">🔄 Replace</button>
+                    <button type="button" class="pic-tool-btn pic-delete-btn" id="btnPicDelete" title="Delete this image">🗑️ Delete</button>
+                    <button type="button" class="pic-tool-btn pic-done-btn" id="btnPicDone" title="Deselect image">✓ Done</button>
+                  </div>
+
+                  <input type="file" id="replaceImageInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;">
                 </div>
 
-                <!-- Synchronized Textarea for Direct Editing and Form Submission -->
-                <textarea id="docPreviewText" name="body_text" rows="8" placeholder="Document preview will appear here once selected. You can edit this text directly before publishing." style="display:none;resize:both;min-height:160px;line-height:1.6;font-family:inherit;"></textarea>
+                <!-- Visual WYSIWYG Editable Box with Interactive Image Overlay -->
+                <div class="editor-visual-wrapper" style="position:relative;">
+                  <div id="docPreviewVisual" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true"
+                       placeholder="Document preview will appear here once selected. You can format text, add bullets, align paragraphs, and insert photos."
+                       style="resize:both;min-height:160px;min-width:200px;max-width:100%;line-height:1.75;outline:none;background:#fff;border:1px solid var(--line);border-radius:0 0 4px 4px;padding:14px 16px;overflow-y:auto;font-family:inherit;">
+                  </div>
+                  <!-- Floating Image Resize Handles Overlay (Outside contenteditable to prevent DOM pollution) -->
+                  <div id="imgResizeOverlay" class="img-resize-overlay hidden" style="position:absolute;pointer-events:none;border:2px solid #5c751f;box-sizing:border-box;z-index:100;">
+                    <div class="resize-handle handle-nw" data-handle="nw" style="pointer-events:auto;"></div>
+                    <div class="resize-handle handle-ne" data-handle="ne" style="pointer-events:auto;"></div>
+                    <div class="resize-handle handle-se" data-handle="se" style="pointer-events:auto;"></div>
+                    <div class="resize-handle handle-sw" data-handle="sw" style="pointer-events:auto;"></div>
+                    <div class="resize-dim-badge" id="resizeDimBadge">320px · 50%</div>
+                  </div>
+                </div>
+
+                <!-- Synchronized Textarea for Form Submission -->
+                <textarea id="docPreviewText" name="body_text" rows="8" style="display:none;"></textarea>
                 
                 <small style="color:var(--muted);display:block;margin-top:6px;font-size:11px;">
-                  Adjustable editor (drag bottom-right corner to resize horizontally and vertically) · Bold, Italics, Underline, Links, Alignment, Bullets, Fonts, and Photos will be published into the vlog · Max 6,000 words
+                  Adjustable editor · Bold, Italics, Underline, Links, Alignment, Bullets, Bengali/English Fonts, and Photos (click any photo to resize & format like MS Word) · Max 6,000 words
                 </small>
               </div>
 
