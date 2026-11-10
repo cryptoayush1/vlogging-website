@@ -1074,6 +1074,8 @@ class Handler(BaseHTTPRequestHandler):
             user = self.require_role('coadmin')
             if not user: return self.send_json(403, {'error': 'Authentication required to view analytics.'})
             return self.send_json(200, get_analytics_data())
+        if parsed.path in ('/vlog', '/article'):
+            return self.serve_static('/vlog.html')
         if parsed.path.startswith('/studio/'):
             return self.serve_static('/admin' + parsed.path[len('/studio'):])
         if parsed.path.startswith('/uploads/'): 

@@ -22,5 +22,18 @@ class AdminPortalTests(unittest.TestCase):
         self.assertTrue((ROOT / 'contact.html').is_file())
         self.assertIn('contact.html', (ROOT / 'index.html').read_text(encoding='utf-8'))
 
+    def test_vlog_full_reading_page_exists_with_live_date_and_branding(self):
+        self.assertTrue((ROOT / 'vlog.html').is_file())
+        html = (ROOT / 'vlog.html').read_text(encoding='utf-8')
+        self.assertIn('FIELD NOTES', html)
+        self.assertIn('id="liveDayText"', html)
+        self.assertIn('id="liveDateText"', html)
+        self.assertIn('id="heroVlogTitle"', html)
+        self.assertIn('id="articleBodyContainer"', html)
+        self.assertIn('id="articleFeedbackForm"', html)
+
+        app_js = (ROOT / 'app.js').read_text(encoding='utf-8')
+        self.assertIn('/vlog.html?id=', app_js)
+
 if __name__ == '__main__':
     unittest.main()

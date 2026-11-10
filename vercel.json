@@ -2,6 +2,14 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/vlog",
+      "destination": "/vlog.html"
+    },
+    {
+      "source": "/article",
+      "destination": "/vlog.html"
+    },
+    {
       "source": "/api/email-relay",
       "destination": "/api/email-relay"
     },

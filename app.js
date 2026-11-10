@@ -51,15 +51,18 @@ function renderVlogs(items = vlogs){
     const thumbStyle = v.thumbnail_filename
       ? `style="background-image:url('/uploads/${encodeURIComponent(v.thumbnail_filename)}');background-size:cover;background-position:center"`
       : '';
+    const targetLink = `/vlog.html?id=${v.id || encodeURIComponent(v.title || '')}`;
     return `
       <article class="vlog-card" data-index="${vlogs.indexOf(v)}">
-        <div class="vlog-thumb ${esc(v.style || 'one')}" ${thumbStyle}></div>
-        <div class="vlog-meta">
-          <span>${esc(v.category)}</span>
-          <span>${esc(v.date)}</span>
-        </div>
-        <h3>${esc(v.title)}</h3>
-        <p>${esc(v.excerpt)}</p>
+        <a href="${targetLink}" style="text-decoration:none;color:inherit;display:block;">
+          <div class="vlog-thumb ${esc(v.style || 'one')}" ${thumbStyle}></div>
+          <div class="vlog-meta">
+            <span>${esc(v.category)}</span>
+            <span>${esc(v.date)}</span>
+          </div>
+          <h3>${esc(v.title)}</h3>
+          <p>${esc(v.excerpt)}</p>
+        </a>
       </article>
     `;
   }).join('');
@@ -73,12 +76,15 @@ function renderVlogs(items = vlogs){
     const thumbStyle = featured.thumbnail_filename
       ? `style="background-image:url('/uploads/${encodeURIComponent(featured.thumbnail_filename)}');background-size:cover;background-position:center"`
       : '';
+    const targetHeroLink = `/vlog.html?id=${featured.id || encodeURIComponent(featured.title || '')}`;
     heroCard.style.cursor = 'pointer';
     heroCard.innerHTML = `
-      <div class="hero-image ${esc(featured.style || 'image-a')}" ${thumbStyle}><span class="play-mark">▶</span></div>
-      <div class="hero-card-meta"><span>Featured film</span><span>${esc(featured.length || 'Recent')}</span></div>
-      <h2>${esc(featured.title)}</h2>
-      <p>${esc(featured.excerpt)}</p>
+      <a href="${targetHeroLink}" style="text-decoration:none;color:inherit;display:block;">
+        <div class="hero-image ${esc(featured.style || 'image-a')}" ${thumbStyle}><span class="play-mark">▶</span></div>
+        <div class="hero-card-meta"><span>Featured film</span><span>${esc(featured.length || 'Recent')}</span></div>
+        <h2>${esc(featured.title)}</h2>
+        <p>${esc(featured.excerpt)}</p>
+      </a>
     `;
   }
 }
@@ -254,55 +260,8 @@ function openVlog(v){
     vlog_id: typeof v.id === 'number' ? v.id : null,
     vlog_title: v.title || ''
   });
-  document.querySelector('#readerCategory').textContent = (v.category || 'Journal') + ' · ' + (v.length || '');
-  document.querySelector('#readerTitle').textContent = v.title || '';
-  document.querySelector('#readerByline').textContent = 'By ' + (v.author || 'Field Notes') + ' · ' + (v.date || '');
-  document.querySelector('#readerExcerpt').textContent = v.excerpt || '';
-  const readerImg = document.querySelector('#readerImage');
-  readerImg.className = 'reader-image vlog-thumb ' + (v.style || 'one');
-  if (v.thumbnail_filename) {
-    readerImg.style.backgroundImage = `url('/uploads/${encodeURIComponent(v.thumbnail_filename)}')`;
-    readerImg.style.backgroundSize = 'cover';
-    readerImg.style.backgroundPosition = 'center';
-  } else {
-    readerImg.style.backgroundImage = '';
-    readerImg.style.backgroundSize = '';
-    readerImg.style.backgroundPosition = '';
-  }
-  
-  const bodyEl = document.querySelector('#readerBody');
-  if (v.body_text && v.body_text.trim()){
-    bodyEl.innerHTML = v.body_text.split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('');
-  } else {
-    bodyEl.innerHTML = '<p class="muted">Full text not available.</p>';
-  }
-
-  const authorCard = document.querySelector('#readerAuthorCard');
-  const authorAvatar = document.querySelector('#readerAuthorAvatar');
-  const authorName = document.querySelector('#readerAuthorName');
-  const authorBio = document.querySelector('#readerAuthorBio');
-  if (authorCard && authorName && authorBio && authorAvatar) {
-    authorName.textContent = v.author || 'Field Notes Author';
-    authorBio.textContent = v.author_bio || 'Contributor to the Field Notes journal archive.';
-    if (v.author_image_filename) {
-      authorAvatar.textContent = '';
-      authorAvatar.style.backgroundImage = `url('/uploads/${encodeURIComponent(v.author_image_filename)}')`;
-    } else {
-      authorAvatar.style.backgroundImage = '';
-      authorAvatar.textContent = (v.author || 'F').charAt(0).toUpperCase();
-    }
-  }
-
-  const successEl = document.querySelector('#feedbackSuccess');
-  const errorEl = document.querySelector('#feedbackError');
-  const formEl = document.querySelector('#feedbackForm');
-  if (successEl) successEl.style.display = 'none';
-  if (errorEl) errorEl.style.display = 'none';
-  if (formEl) formEl.reset();
-
-  loadFeedback(v, false);
-  startFeedbackPolling();
-  dialog.showModal();
+  const targetId = v.id || encodeURIComponent(v.title || '');
+  window.location.href = `/vlog.html?id=${targetId}`;
 }
 
 const feedbackForm = document.querySelector('#feedbackForm');
