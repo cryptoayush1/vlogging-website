@@ -117,6 +117,9 @@ async function loadPublishedVlogs(){
       excerpt: v.excerpt,
       author: v.author,
       length: `${v.word_count} words`,
+      word_count: v.word_count || 0,
+      filename: v.filename || '',
+      created_at: v.created_at || '',
       style: styles[i % styles.length],
       body_text: v.body_text || '',
       thumbnail_filename: v.thumbnail_filename || '',
@@ -256,6 +259,10 @@ function trackEvent(eventType, extra = {}) {
 function openVlog(v){
   if (!v) return;
   currentOpenVlog = v;
+  try {
+    sessionStorage.setItem('field_notes_selected_vlog', JSON.stringify(v));
+    localStorage.setItem('field_notes_selected_vlog', JSON.stringify(v));
+  } catch(e) {}
   trackEvent('vlog_click', {
     vlog_id: typeof v.id === 'number' ? v.id : null,
     vlog_title: v.title || ''
