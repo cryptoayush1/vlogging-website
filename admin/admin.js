@@ -798,19 +798,58 @@ let activeSelectedImg = null;
 let isDraggingResize = false;
 let draggedItem = null;
 
-function showDropLineAt(range) {
+function showDropLine(clientX, clientY) {
   if (!editorDropLine || !docPreviewVisual) return;
   const containerRect = docPreviewVisual.parentElement.getBoundingClientRect();
-  let block = range.startContainer;
-  if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
-  if (!block || !docPreviewVisual.contains(block)) return;
 
-  const blockRect = block.getBoundingClientRect();
-  const top = (blockRect.top - containerRect.top) + (range.startOffset > 0 ? blockRect.height : 0) + docPreviewVisual.parentElement.scrollTop;
+  let top = null;
+
+  // Try caret range first
+  let range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(clientX, clientY);
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(clientX, clientY);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+    }
+  }
+
+  if (range && docPreviewVisual.contains(range.startContainer)) {
+    let block = range.startContainer;
+    if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+    if (block && docPreviewVisual.contains(block)) {
+      const blockRect = block.getBoundingClientRect();
+      top = (blockRect.top - containerRect.top) + (clientY > blockRect.top + blockRect.height / 2 ? blockRect.height : 0) + docPreviewVisual.parentElement.scrollTop;
+    }
+  }
+
+  if (top === null) {
+    // Fallback using elementFromPoint
+    let el = document.elementFromPoint(clientX, clientY);
+    if (el && draggedItem && draggedItem.contains(el)) {
+      draggedItem.style.visibility = 'hidden';
+      el = document.elementFromPoint(clientX, clientY);
+      draggedItem.style.visibility = '';
+    }
+    if (el && docPreviewVisual.contains(el)) {
+      const block = el.closest('p, blockquote, h1, h2, h3, h4, div, figure') || el;
+      if (block && docPreviewVisual.contains(block)) {
+        const blockRect = block.getBoundingClientRect();
+        top = (blockRect.top - containerRect.top) + (clientY > blockRect.top + blockRect.height / 2 ? blockRect.height : 0) + docPreviewVisual.parentElement.scrollTop;
+      }
+    }
+  }
+
+  if (top === null) {
+    top = (clientY - containerRect.top) + docPreviewVisual.parentElement.scrollTop;
+  }
 
   editorDropLine.style.top = `${Math.max(0, top)}px`;
-  editorDropLine.style.left = `16px`;
-  editorDropLine.style.width = `${Math.max(120, docPreviewVisual.clientWidth - 32)}px`;
+  editorDropLine.style.left = `14px`;
+  editorDropLine.style.width = `${Math.max(120, docPreviewVisual.clientWidth - 28)}px`;
   editorDropLine.classList.remove('hidden');
 }
 
@@ -955,16 +994,29 @@ if (docPreviewVisual) {
     }
   });
 
-  docPreviewVisual.addEventListener('dragover', (e) => {
+  function handleEditorDragOver(e) {
     if (!draggedItem) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    showDropLine(e.clientX, e.clientY);
+  }
 
+  function handleEditorDrop(e) {
+    if (!draggedItem) return;
+    e.preventDefault();
+    e.stopPropagation();
+    hideDropLine();
+
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    let placed = false;
+
+    // 1. Try caretRangeFromPoint / caretPositionFromPoint
     let range = null;
     if (document.caretRangeFromPoint) {
-      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      range = document.caretRangeFromPoint(clientX, clientY);
     } else if (document.caretPositionFromPoint) {
-      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      const pos = document.caretPositionFromPoint(clientX, clientY);
       if (pos) {
         range = document.createRange();
         range.setStart(pos.offsetNode, pos.offset);
@@ -972,10 +1024,93 @@ if (docPreviewVisual) {
       }
     }
 
-    if (range && docPreviewVisual.contains(range.startContainer)) {
-      showDropLineAt(range);
+    if (range && docPreviewVisual.contains(range.startContainer) && !draggedItem.contains(range.startContainer)) {
+      let node = range.startContainer;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const parentP = node.closest('p, blockquote, div, h1, h2, h3, h4, figure') || node.parentElement;
+        if (parentP && parentP !== docPreviewVisual && docPreviewVisual.contains(parentP)) {
+          if (range.startOffset < (node.length / 2)) {
+            parentP.parentElement.insertBefore(draggedItem, parentP);
+          } else {
+            parentP.parentElement.insertBefore(draggedItem, parentP.nextSibling);
+          }
+          placed = true;
+        }
+      } else if (node === docPreviewVisual) {
+        if (range.startOffset < node.childNodes.length) {
+          node.insertBefore(draggedItem, node.childNodes[range.startOffset]);
+        } else {
+          node.appendChild(draggedItem);
+        }
+        placed = true;
+      } else {
+        const block = node.closest('p, blockquote, h1, h2, h3, h4, div, figure') || node;
+        if (block && block !== draggedItem && block.parentElement) {
+          block.parentElement.insertBefore(draggedItem, block.nextSibling);
+          placed = true;
+        }
+      }
     }
-  });
+
+    // 2. Fallback: find element directly under mouse cursor with elementFromPoint
+    if (!placed) {
+      let el = document.elementFromPoint(clientX, clientY);
+      if (el && draggedItem.contains(el)) {
+        draggedItem.style.visibility = 'hidden';
+        el = document.elementFromPoint(clientX, clientY);
+        draggedItem.style.visibility = '';
+      }
+
+      if (el && docPreviewVisual.contains(el)) {
+        const block = el.closest('p, blockquote, h1, h2, h3, h4, div, figure') || el;
+        if (block && block !== draggedItem && docPreviewVisual.contains(block)) {
+          const rect = block.getBoundingClientRect();
+          if (clientY < rect.top + rect.height / 2) {
+            block.parentElement.insertBefore(draggedItem, block);
+          } else {
+            block.parentElement.insertBefore(draggedItem, block.nextSibling);
+          }
+          placed = true;
+        }
+      }
+    }
+
+    // 3. Fallback: if dropped at top or bottom / empty area of editor
+    if (!placed) {
+      const visualRect = docPreviewVisual.getBoundingClientRect();
+      if (clientY < visualRect.top + 60) {
+        docPreviewVisual.insertBefore(draggedItem, docPreviewVisual.firstChild);
+      } else {
+        docPreviewVisual.appendChild(draggedItem);
+      }
+      placed = true;
+    }
+
+    // Ensure empty paragraph exists after figure so user can keep typing easily
+    if (!draggedItem.nextElementSibling || draggedItem.nextElementSibling.tagName === 'FIGURE') {
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      draggedItem.parentElement.insertBefore(p, draggedItem.nextSibling);
+    }
+
+    const img = draggedItem.querySelector('img') || (draggedItem.tagName === 'IMG' ? draggedItem : null);
+    draggedItem.classList.remove('is-dragging');
+    draggedItem = null;
+
+    makeImagesDraggable();
+    if (img) {
+      selectEditorImage(img);
+    }
+    syncVisualToText();
+  }
+
+  docPreviewVisual.addEventListener('dragover', handleEditorDragOver);
+  docPreviewVisual.addEventListener('drop', handleEditorDrop);
+
+  if (docPreviewVisual.parentElement) {
+    docPreviewVisual.parentElement.addEventListener('dragover', handleEditorDragOver);
+    docPreviewVisual.parentElement.addEventListener('drop', handleEditorDrop);
+  }
 
   docPreviewVisual.addEventListener('dragleave', (e) => {
     if (!docPreviewVisual.contains(e.relatedTarget)) {
@@ -989,64 +1124,6 @@ if (docPreviewVisual) {
       draggedItem = null;
     }
     hideDropLine();
-  });
-
-  docPreviewVisual.addEventListener('drop', (e) => {
-    if (!draggedItem) return;
-    e.preventDefault();
-    e.stopPropagation();
-    hideDropLine();
-
-    let range = null;
-    if (document.caretRangeFromPoint) {
-      range = document.caretRangeFromPoint(e.clientX, e.clientY);
-    } else if (document.caretPositionFromPoint) {
-      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-      if (pos) {
-        range = document.createRange();
-        range.setStart(pos.offsetNode, pos.offset);
-        range.collapse(true);
-      }
-    }
-
-    if (range && docPreviewVisual.contains(range.startContainer)) {
-      if (!draggedItem.contains(range.startContainer)) {
-        let node = range.startContainer;
-        if (node.nodeType === Node.TEXT_NODE) {
-          const parentP = node.closest('p, blockquote, div') || node.parentElement;
-          if (parentP && parentP !== docPreviewVisual) {
-            if (range.startOffset < (node.length / 2)) {
-              parentP.parentElement.insertBefore(draggedItem, parentP);
-            } else {
-              parentP.parentElement.insertBefore(draggedItem, parentP.nextSibling);
-            }
-          } else {
-            range.insertNode(draggedItem);
-          }
-        } else {
-          if (node === docPreviewVisual) {
-            if (range.startOffset < node.childNodes.length) {
-              node.insertBefore(draggedItem, node.childNodes[range.startOffset]);
-            } else {
-              node.appendChild(draggedItem);
-            }
-          } else {
-            const block = node.closest('p, blockquote, h1, h2, h3, div') || node;
-            block.parentElement.insertBefore(draggedItem, block.nextSibling);
-          }
-        }
-      }
-    }
-
-    const img = draggedItem.querySelector('img') || (draggedItem.tagName === 'IMG' ? draggedItem : null);
-    draggedItem.classList.remove('is-dragging');
-    draggedItem = null;
-
-    makeImagesDraggable();
-    if (img) {
-      selectEditorImage(img);
-    }
-    syncVisualToText();
   });
 }
 
