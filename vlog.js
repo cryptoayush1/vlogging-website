@@ -376,13 +376,13 @@
 
         feedbackForm.reset();
         if (status) {
-          status.style.color = '#5c751f';
+          status.style.color = '#7ce352';
           status.textContent = '✓ Thank you! Your reflection has been published.';
         }
         loadFeedbackList(currentVlog);
       } catch (err) {
         if (status) {
-          status.style.color = '#b43434';
+          status.style.color = '#ff8b8b';
           status.textContent = 'Error: ' + err.message;
         }
       } finally {
