@@ -192,10 +192,58 @@ class AnalyticsFeatureTests(unittest.TestCase):
         self.assertIn('id="repYearlyViews"', html)
         self.assertIn('id="repAllViews"', html)
         self.assertIn('id="trendChartContainer"', html)
+        self.assertIn('id="openShareModalBtn"', html)
+        self.assertIn('id="shareAnalyticsDialog"', html)
+        self.assertIn('id="shareRecipientEmail"', html)
 
         js = (Path(__file__).parent / 'admin' / 'admin.js').read_text(encoding='utf-8')
         self.assertIn('updateActivePeriodKPIs', js)
         self.assertIn('renderTrendChart', js)
+        self.assertIn('openShareDialog', js)
+        self.assertIn('/api/admin/analytics/share', js)
+        self.assertIn('share-vlog-btn', js)
+
+    def test_share_analytics_overall_report_email_content(self):
+        # Insert test data
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash) VALUES('page_view', 'ip_test1')")
+        self.conn.execute("INSERT INTO analytics_events(event_type, ip_hash) VALUES('vlog_click', 'ip_test1')")
+        self.conn.commit()
+
+        # Test the email formatting logic in send_bot_email
+        server.SENT_EMAILS.clear()
+        target_email = "testrecipient@gmail.com"
+        subject = "Field Notes Studio — Executive Overview Analytics Report"
+        body = "Website Page Views: 1\nVlog Reads / Clicks: 1\nUnique Visitors: 1"
+
+        server.send_bot_email(target_email, subject, body)
+        self.assertGreater(len(server.SENT_EMAILS), 0)
+        last_email = server.SENT_EMAILS[-1]
+        self.assertEqual(last_email['to'], target_email)
+        self.assertIn("Executive Overview", last_email['subject'])
+        self.assertIn("Website Page Views: 1", last_email['body'])
+
+    def test_share_vlog_specific_report_email_content(self):
+        cur = self.conn.execute(
+            "INSERT INTO vlogs(title, category, author, excerpt, filename, word_count) VALUES(?,?,?,?,?,?)",
+            ('Solo Journey', 'Cinema', 'Ayush', 'A quiet film...', 'solo.docx', 850)
+        )
+        v_id = cur.lastrowid
+        self.conn.execute("INSERT INTO analytics_events(event_type, vlog_id, vlog_title, ip_hash) VALUES('vlog_click', ?, 'Solo Journey', 'ip1')", (v_id,))
+        self.conn.execute("INSERT INTO feedback(vlog_id, vlog_title, author_name, author_email, comment) VALUES(?, 'Solo Journey', 'Viewer A', 'a@gmail.com', 'Beautiful cinematography')", (v_id,))
+        self.conn.commit()
+
+        server.SENT_EMAILS.clear()
+        target_email = "ayushmondal.net3@gmail.com"
+        subject = f'Field Notes Analytics Report — "Solo Journey"'
+        body = f"Title: Solo Journey\nAuthor: Ayush\nTotal Reads / Clicks: 1\nTotal Reader Reflections: 1"
+
+        server.send_bot_email(target_email, subject, body)
+        self.assertGreater(len(server.SENT_EMAILS), 0)
+        last_email = server.SENT_EMAILS[-1]
+        self.assertEqual(last_email['to'], target_email)
+        self.assertIn("Solo Journey", last_email['subject'])
+        self.assertIn("Total Reads / Clicks: 1", last_email['body'])
+        self.assertIn("Total Reader Reflections: 1", last_email['body'])
 
 if __name__ == '__main__':
     unittest.main()

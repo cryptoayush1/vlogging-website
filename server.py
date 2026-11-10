@@ -865,8 +865,8 @@ class Handler(BaseHTTPRequestHandler):
             with db() as conn:
                 return self.send_json(200, [dict(r) for r in conn.execute('SELECT * FROM contacts ORDER BY created_at DESC')])
         if parsed.path == '/api/admin/analytics':
-            user = self.require_role('admin')
-            if not user: return self.send_json(403, {'error': 'Only the admin can view analytics.'})
+            user = self.require_role('coadmin')
+            if not user: return self.send_json(403, {'error': 'Authentication required to view analytics.'})
             with db() as conn:
                 total_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'").fetchone()[0]
                 total_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click'").fetchone()[0]
@@ -1473,6 +1473,203 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute('DELETE FROM analytics_events')
                 conn.commit()
             return self.send_json(200, {'reset': True})
+        if parsed.path == '/api/admin/analytics/share' and self.command == 'POST':
+            user = self.require_role('coadmin')
+            if not user:
+                return self.send_json(403, {'error': 'Authentication required to share analytics.'})
+            try:
+                body = json.loads(self.read_body())
+                recipient_email = str(body.get('recipient_email', '')).strip().lower()
+                vlog_id = body.get('vlog_id')
+                period = str(body.get('period', 'all_time')).strip().lower()
+
+                if not recipient_email or not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', recipient_email):
+                    return self.send_json(400, {'error': 'Please provide a valid Gmail or email address.'})
+
+                if vlog_id is not None and str(vlog_id).strip() != '':
+                    try:
+                        vlog_id = int(vlog_id)
+                    except (ValueError, TypeError):
+                        return self.send_json(400, {'error': 'Invalid vlog ID.'})
+
+                    with db() as conn:
+                        vlog = conn.execute("SELECT * FROM vlogs WHERE id=?", (vlog_id,)).fetchone()
+                        if not vlog:
+                            return self.send_json(404, {'error': 'Vlog not found.'})
+                        title = vlog['title']
+                        author = vlog['author']
+                        category = vlog['category']
+                        word_count = vlog['word_count']
+                        published_at = vlog['created_at']
+
+                        total_clicks = conn.execute(
+                            "SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?))",
+                            (vlog_id, title)
+                        ).fetchone()[0]
+
+                        weekly_clicks = conn.execute(
+                            "SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?)) AND created_at >= datetime('now', '-7 days')",
+                            (vlog_id, title)
+                        ).fetchone()[0]
+
+                        monthly_clicks = conn.execute(
+                            "SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?)) AND created_at >= datetime('now', '-30 days')",
+                            (vlog_id, title)
+                        ).fetchone()[0]
+
+                        feedbacks = conn.execute(
+                            "SELECT author_name, author_email, comment, created_at FROM feedback WHERE ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?)) ORDER BY created_at DESC",
+                            (vlog_id, title)
+                        ).fetchall()
+
+                    subject = f"Field Notes Analytics Report — \"{title}\""
+                    if feedbacks:
+                        feedback_lines = []
+                        for fb in feedbacks:
+                            d_str = str(fb['created_at']).split(' ')[0]
+                            email_part = f" <{fb['author_email']}>" if fb['author_email'] else ""
+                            feedback_lines.append(f"• {fb['author_name']}{email_part} ({d_str}):\n  \"{fb['comment']}\"")
+                        feedback_text = f"\n\nREADER REFLECTIONS & FEEDBACK ({len(feedbacks)} total):\n" + "\n\n".join(feedback_lines)
+                    else:
+                        feedback_text = "\n\nREADER REFLECTIONS & FEEDBACK:\nNo reader reflections submitted for this film yet."
+
+                    msg_body = f"""Hello,
+
+Here is the analytical performance report for the published vlog "{title}":
+
+============================================================
+PUBLICATION DETAILS
+============================================================
+• Title: {title}
+• Author: {author}
+• Category: {category}
+• Word Count: {word_count} words
+• Published Date: {published_at}
+
+============================================================
+READERSHIP & ENGAGEMENT METRICS
+============================================================
+• Total Reads / Clicks: {total_clicks}
+• Reads in Past 7 Days: {weekly_clicks}
+• Reads in Past 30 Days: {monthly_clicks}
+• Total Reader Reflections: {len(feedbacks)}
+{feedback_text}
+
+============================================================
+Generated by Field Notes Studio Dashboard
+Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+============================================================
+"""
+                else:
+                    # Overall Analytics Report
+                    with db() as conn:
+                        total_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'").fetchone()[0]
+                        total_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click'").fetchone()[0]
+                        unique_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != ''").fetchone()[0]
+                        total_feedback = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+
+                        weekly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                        weekly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                        weekly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
+                        weekly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-7 days')").fetchone()[0]
+
+                        monthly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                        monthly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                        monthly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
+                        monthly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-30 days')").fetchone()[0]
+
+                        yearly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                        yearly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                        yearly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
+                        yearly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-365 days')").fetchone()[0]
+
+                        vlog_rows = conn.execute("SELECT id, title, author, category, word_count FROM vlogs ORDER BY created_at DESC").fetchall()
+                        top_vlogs = []
+                        for v in vlog_rows:
+                            v_id = v['id']
+                            v_title = v['title']
+                            clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?))", (v_id, v_title)).fetchone()[0]
+                            fb_c = conn.execute("SELECT COUNT(*) FROM feedback WHERE ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?))", (v_id, v_title)).fetchone()[0]
+                            top_vlogs.append((clicks, fb_c, v_title, v['author'], v['category']))
+                        top_vlogs.sort(key=lambda x: x[0], reverse=True)
+
+                    top_lines = []
+                    for idx, item in enumerate(top_vlogs[:10], start=1):
+                        top_lines.append(f"{idx}. \"{item[2]}\" — {item[0]} reads, {item[1]} reflections (By {item[3]} · {item[4]})")
+                    top_text = "\n".join(top_lines) if top_lines else "No published films yet."
+
+                    period_names = {
+                        'weekly': 'Weekly (Last 7 Days)',
+                        'monthly': 'Monthly (Last 30 Days)',
+                        'yearly': 'Yearly (Last 365 Days)',
+                        'all_time': 'All-Time Cumulative'
+                    }
+                    period_title = period_names.get(period, 'Executive Overview')
+
+                    subject = f"Field Notes Studio — {period_title} Analytics Report"
+                    msg_body = f"""Hello,
+
+Here is the {period_title} Analytical Performance Report for Field Notes:
+
+============================================================
+TIME-WINDOW COMPARISON
+============================================================
+1. THIS WEEK (LAST 7 DAYS):
+   • Website Page Views: {weekly_views}
+   • Vlog Reads / Clicks: {weekly_clicks}
+   • Unique Visitors: {weekly_visitors}
+   • Reader Reflections: {weekly_feedback}
+
+2. THIS MONTH (LAST 30 DAYS):
+   • Website Page Views: {monthly_views}
+   • Vlog Reads / Clicks: {monthly_clicks}
+   • Unique Visitors: {monthly_visitors}
+   • Reader Reflections: {monthly_feedback}
+
+3. THIS YEAR (LAST 365 DAYS):
+   • Website Page Views: {yearly_views}
+   • Vlog Reads / Clicks: {yearly_clicks}
+   • Unique Visitors: {yearly_visitors}
+   • Reader Reflections: {yearly_feedback}
+
+4. ALL-TIME LIFETIME TOTALS:
+   • Website Page Views: {total_views}
+   • Vlog Reads / Clicks: {total_clicks}
+   • Unique Visitors: {unique_visitors}
+   • Reader Reflections: {total_feedback}
+
+============================================================
+TOP PERFORMING PUBLISHED FILMS (BY READERSHIP)
+============================================================
+{top_text}
+
+============================================================
+Generated by Field Notes Studio Dashboard
+Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+============================================================
+"""
+
+                send_bot_email(recipient_email, subject, msg_body)
+                last = SENT_EMAILS[-1] if SENT_EMAILS else {}
+                if last.get('sent_via_smtp'):
+                    return self.send_json(200, {
+                        'success': True,
+                        'message': f'Report successfully sent to {recipient_email}. Please check your inbox.'
+                    })
+                else:
+                    err = last.get('error')
+                    if not err:
+                        return self.send_json(200, {
+                            'success': True,
+                            'message': f'Report recorded for {recipient_email}.'
+                        })
+                    else:
+                        return self.send_json(500, {
+                            'success': False,
+                            'error': f'Failed to deliver email: {err}'
+                        })
+            except Exception as e:
+                return self.send_json(400, {'success': False, 'error': str(e)})
         if parsed.path == '/api/admin/test-email' and self.command == 'POST':
             try:
                 body = json.loads(self.read_body())

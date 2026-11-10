@@ -33,25 +33,27 @@ class UserAccessTests(unittest.TestCase):
         self.assertEqual(users[0]['username'], 'writer3')
         self.assertNotIn('password_hash', users[0])
 
-    def test_bot_sends_registration_email_with_credentials(self):
+    def _wait_for_email(self, to_email, timeout=1.5):
         import time
-        SENT_EMAILS.clear()
+        start = time.time()
+        while time.time() - start < timeout:
+            for m in reversed(SENT_EMAILS):
+                if m['to'] == to_email:
+                    return m
+            time.sleep(0.05)
+        self.fail(f"Email to {to_email} not found in SENT_EMAILS within {timeout}s")
+
+    def test_bot_sends_registration_email_with_credentials(self):
         send_registration_email('testwriter', 'testwriter@gmail.com', 'Pass1234!', 'coadmin')
-        time.sleep(0.1)
-        self.assertTrue(len(SENT_EMAILS) >= 1)
-        mail = SENT_EMAILS[-1]
+        mail = self._wait_for_email('testwriter@gmail.com')
         self.assertEqual(mail['to'], 'testwriter@gmail.com')
         self.assertIn('testwriter', mail['body'])
         self.assertIn('Pass1234!', mail['body'])
         self.assertIn('COADMIN', mail['body'])
 
     def test_bot_sends_admin_registration_email(self):
-        import time
-        SENT_EMAILS.clear()
         send_registration_email('bossadmin', 'admin@example.com', 'SuperSecret99!', 'admin')
-        time.sleep(0.1)
-        self.assertTrue(len(SENT_EMAILS) >= 1)
-        mail = SENT_EMAILS[-1]
+        mail = self._wait_for_email('admin@example.com')
         self.assertEqual(mail['to'], 'admin@example.com')
         self.assertIn('bossadmin', mail['body'])
         self.assertIn('SuperSecret99!', mail['body'])
@@ -59,32 +61,23 @@ class UserAccessTests(unittest.TestCase):
         self.assertIn('Administrator', mail['subject'])
 
     def test_bot_sends_suspension_email(self):
-        import time
-        SENT_EMAILS.clear()
         send_suspension_email('badactor', 'badactor@gmail.com')
-        time.sleep(0.1)
-        self.assertTrue(len(SENT_EMAILS) >= 1)
-        mail = SENT_EMAILS[-1]
+        mail = self._wait_for_email('badactor@gmail.com')
         self.assertEqual(mail['to'], 'badactor@gmail.com')
         self.assertIn('SUSPENDED', mail['body'])
         self.assertIn('badactor', mail['body'])
         self.assertIn('badactor@gmail.com', mail['body'])
 
     def test_registration_email_uses_dynamic_live_admin_url(self):
-        import time, os
-        SENT_EMAILS.clear()
+        import os
         send_registration_email('livewriter', 'live@gmail.com', 'Pass1234!', 'coadmin', request_host='my-vlog-studio.onrender.com')
-        time.sleep(0.1)
-        self.assertTrue(len(SENT_EMAILS) >= 1)
-        mail = SENT_EMAILS[-1]
+        mail = self._wait_for_email('live@gmail.com')
         self.assertIn('https://my-vlog-studio.onrender.com/admin/', mail['body'])
 
         # Test with RENDER_EXTERNAL_URL env var
         os.environ['RENDER_EXTERNAL_URL'] = 'https://cloud-admin.onrender.com'
-        SENT_EMAILS.clear()
         send_registration_email('cloudwriter', 'cloud@gmail.com', 'Pass1234!', 'coadmin')
-        time.sleep(0.1)
-        mail2 = SENT_EMAILS[-1]
+        mail2 = self._wait_for_email('cloud@gmail.com')
         self.assertIn('https://cloud-admin.onrender.com/admin/', mail2['body'])
         del os.environ['RENDER_EXTERNAL_URL']
 

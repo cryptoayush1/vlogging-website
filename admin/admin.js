@@ -10,8 +10,8 @@ function showDashboard(user){
   document.querySelector('#accountLabel').textContent=`${currentUser.username} · ${currentUser.role}`;
   checkSetupStatus();
   loadArchive();
-  if(currentUser.role==='admin'){
-    showAdminTools();
+  if(currentUser.role==='admin' || currentUser.role==='coadmin'){
+    if(currentUser.role==='admin') showAdminTools();
     setupAdminAnalytics();
   } else {
     const tabA=document.querySelector('#tabAnalytics');
@@ -27,7 +27,7 @@ function startAnalyticsPolling(){
   stopAnalyticsPolling();
   analyticsPollingTimer=setInterval(async()=>{
     const viewA=document.querySelector('#analyticsView');
-    if(viewA && !viewA.classList.contains('hidden') && currentUser && currentUser.role==='admin'){
+    if(viewA && !viewA.classList.contains('hidden') && currentUser && (currentUser.role==='admin' || currentUser.role==='coadmin')){
       await loadAnalytics(true);
     }
   },2000);
@@ -118,7 +118,149 @@ function setupAdminAnalytics(){
         }
       });
     }
+
+    const openShareModalBtn = document.querySelector('#openShareModalBtn');
+    if(openShareModalBtn){
+      openShareModalBtn.addEventListener('click', () => {
+        openShareDialog('', '');
+      });
+    }
+
+    const shareDialog = document.querySelector('#shareAnalyticsDialog');
+    const closeShareDialogBtn = document.querySelector('#closeShareDialogBtn');
+    const cancelShareDialogBtn = document.querySelector('#cancelShareDialogBtn');
+    const shareForm = document.querySelector('#shareAnalyticsForm');
+
+    if(closeShareDialogBtn && shareDialog){
+      closeShareDialogBtn.addEventListener('click', () => shareDialog.close());
+    }
+    if(cancelShareDialogBtn && shareDialog){
+      cancelShareDialogBtn.addEventListener('click', () => shareDialog.close());
+    }
+    if(shareDialog){
+      shareDialog.addEventListener('click', (e) => {
+        if(e.target === shareDialog) shareDialog.close();
+      });
+    }
+
+    if(shareForm){
+      shareForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const emailInput = document.querySelector('#shareRecipientEmail');
+        const vlogIdInput = document.querySelector('#shareVlogId');
+        const periodSelect = document.querySelector('#sharePeriodSelect');
+        const submitBtn = document.querySelector('#submitShareBtn');
+        const statusMsg = document.querySelector('#shareStatusMsg');
+
+        const recipient_email = (emailInput ? emailInput.value : '').trim();
+        const vlog_id = (vlogIdInput ? vlogIdInput.value : '').trim();
+        const period = (periodSelect ? periodSelect.value : 'all_time');
+
+        if(!recipient_email){
+          if(statusMsg){
+            statusMsg.style.display = 'block';
+            statusMsg.style.background = '#fef2f2';
+            statusMsg.style.color = '#b43434';
+            statusMsg.style.border = '1px solid #fecaca';
+            statusMsg.textContent = 'Please enter a valid recipient Gmail address.';
+          }
+          return;
+        }
+
+        try {
+          if(submitBtn){
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>✉️ Sending report to Gmail…</span>';
+          }
+          if(statusMsg){
+            statusMsg.style.display = 'block';
+            statusMsg.style.background = '#eff6ff';
+            statusMsg.style.color = '#1e40af';
+            statusMsg.style.border = '1px solid #bfdbfe';
+            statusMsg.textContent = 'Contacting mail server and delivering report to ' + recipient_email + '…';
+          }
+
+          const res = await api('/api/admin/analytics/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient_email,
+              vlog_id: vlog_id ? parseInt(vlog_id, 10) : null,
+              period
+            })
+          });
+
+          if(statusMsg){
+            statusMsg.style.display = 'block';
+            statusMsg.style.background = '#f0fdf4';
+            statusMsg.style.color = '#166534';
+            statusMsg.style.border = '1px solid #bbf7d0';
+            statusMsg.textContent = '✓ ' + (res.message || ('Report successfully sent to ' + recipient_email + '. Please check your Gmail inbox!'));
+          }
+
+          setTimeout(() => {
+            if(shareDialog && shareDialog.open){
+              shareDialog.close();
+            }
+          }, 2400);
+        } catch(err){
+          if(statusMsg){
+            statusMsg.style.display = 'block';
+            statusMsg.style.background = '#fef2f2';
+            statusMsg.style.color = '#b43434';
+            statusMsg.style.border = '1px solid #fecaca';
+            statusMsg.textContent = 'Error: ' + (err.message || 'Failed to send report. Please verify recipient email.');
+          }
+        } finally {
+          if(submitBtn){
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>✉️ Send Report to Gmail</span>';
+          }
+        }
+      });
+    }
   }
+}
+
+function openShareDialog(vlogId = '', vlogTitle = ''){
+  const dialog = document.querySelector('#shareAnalyticsDialog');
+  if(!dialog) return;
+  const titleEl = document.querySelector('#shareDialogTitle');
+  const kickerEl = document.querySelector('#shareDialogKicker');
+  const banner = document.querySelector('#shareVlogBanner');
+  const bannerTitle = document.querySelector('#shareVlogBannerTitle');
+  const periodGroup = document.querySelector('#sharePeriodGroup');
+  const vlogIdInput = document.querySelector('#shareVlogId');
+  const statusMsg = document.querySelector('#shareStatusMsg');
+  const emailInput = document.querySelector('#shareRecipientEmail');
+
+  if(statusMsg){
+    statusMsg.style.display = 'none';
+    statusMsg.textContent = '';
+  }
+
+  if(vlogIdInput) vlogIdInput.value = vlogId ? String(vlogId) : '';
+
+  if(vlogId && vlogTitle){
+    if(kickerEl) kickerEl.textContent = 'Single Film Analytics';
+    if(titleEl) titleEl.textContent = 'Share Vlog Analytics via Gmail';
+    if(banner) banner.style.display = 'block';
+    if(bannerTitle) bannerTitle.textContent = vlogTitle;
+    if(periodGroup) periodGroup.style.display = 'none';
+  } else {
+    if(kickerEl) kickerEl.textContent = 'Audience Intelligence';
+    if(titleEl) titleEl.textContent = 'Share Overall Analytics via Gmail';
+    if(banner) banner.style.display = 'none';
+    if(periodGroup) periodGroup.style.display = 'block';
+  }
+
+  if(typeof dialog.showModal === 'function'){
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', '');
+  }
+
+  if(emailInput) emailInput.focus();
 }
 
 let currentAnalyticsData = null;
@@ -298,9 +440,14 @@ async function loadAnalytics(isBackgroundPoll=false){
                 <h3>${esc(v.title)}</h3>
                 <span class="meta-sub">${esc(v.category)} · By ${esc(v.author)} · ${v.word_count||0} words</span>
               </div>
-              <span class="meta-sub" style="font-weight:600;color:var(--ink)">
-                ${v.clicks||0} reads · ${v.feedback_count||0} reflections
-              </span>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span class="meta-sub" style="font-weight:600;color:var(--ink)">
+                  ${v.clicks||0} reads · ${v.feedback_count||0} reflections
+                </span>
+                <button type="button" class="share-vlog-btn" data-id="${v.id}" data-title="${esc(v.title)}" title="Share this vlog's performance via Gmail">
+                  ✉️ Share report
+                </button>
+              </div>
             </div>
             <div class="chart-bars-wrap">
               <div class="chart-bar-row">
@@ -321,6 +468,13 @@ async function loadAnalytics(isBackgroundPoll=false){
           </div>
         `;
       }).join('');
+
+      chartsEl.querySelectorAll('.share-vlog-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openShareDialog(btn.dataset.id, btn.dataset.title);
+        });
+      });
     }
     
     const feedbackList=data.feedback||[];

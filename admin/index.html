@@ -124,6 +124,7 @@
               <button type="button" class="period-btn" data-period="yearly">Yearly (365d)</button>
             </div>
             <button type="button" class="secondary-button" id="refreshAnalyticsBtn" style="width:auto;margin:0;padding:8px 16px;font-size:12px">↻ Refresh data</button>
+            <button type="button" class="secondary-button" id="openShareModalBtn" style="width:auto;margin:0;padding:8px 16px;font-size:12px;display:inline-flex;align-items:center;gap:6px;background:#fff;border-color:var(--line);color:var(--ink);">✉️ Share Report via Gmail</button>
           </div>
         </div>
 
@@ -250,5 +251,52 @@
         </details>
       </div>
     </section>
+
+    <!-- Share Analytics Report Modal -->
+    <dialog id="shareAnalyticsDialog" class="studio-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <div>
+            <p class="kicker" id="shareDialogKicker" style="margin-bottom:6px;">Email Distribution</p>
+            <h3 id="shareDialogTitle" style="margin:0;font-family:Georgia,serif;font-weight:400;font-size:22px;color:var(--ink);">Share Analytics Report via Gmail</h3>
+          </div>
+          <button type="button" class="dialog-close-btn" id="closeShareDialogBtn" aria-label="Close dialog">&times;</button>
+        </div>
+        
+        <form id="shareAnalyticsForm" style="margin-top:20px;display:flex;flex-direction:column;gap:16px;">
+          <input type="hidden" id="shareVlogId" value="">
+          
+          <div id="shareVlogBanner" style="display:none;padding:12px 14px;background:#f3efe6;border:1px solid var(--line);border-radius:4px;">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:2px;font-weight:700;">Particular Vlog Report</span>
+            <strong id="shareVlogBannerTitle" style="color:var(--ink);font-size:14px;font-family:Georgia,serif;"></strong>
+          </div>
+
+          <div id="sharePeriodGroup">
+            <label for="sharePeriodSelect" style="display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;">Report Scope / Time Window</label>
+            <select id="sharePeriodSelect" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-size:13px;background:#fff;color:var(--ink);">
+              <option value="all_time">Executive Overview (All-Time + Weekly, Monthly, Yearly Comparison)</option>
+              <option value="weekly">Weekly Report (Last 7 Days)</option>
+              <option value="monthly">Monthly Report (Last 30 Days)</option>
+              <option value="yearly">Yearly Report (Last 365 Days)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="shareRecipientEmail" style="display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;">Recipient Gmail / Email Address *</label>
+            <input type="email" id="shareRecipientEmail" placeholder="Enter recipient email (e.g. yourname@gmail.com)" required style="width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:3px;font-size:13px;background:#fff;color:var(--ink);box-sizing:border-box;">
+            <small style="display:block;color:var(--muted);font-size:11px;margin-top:5px;">The detailed analytical performance report will be delivered directly to this inbox.</small>
+          </div>
+
+          <div id="shareStatusMsg" style="display:none;font-size:12px;padding:10px 14px;border-radius:4px;line-height:1.4;"></div>
+
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;">
+            <button type="button" class="secondary-button" id="cancelShareDialogBtn" style="width:auto;margin:0;padding:9px 18px;font-size:12px;">Cancel</button>
+            <button type="submit" class="primary" id="submitShareBtn" style="width:auto;margin:0;padding:9px 22px;font-size:12px;display:inline-flex;align-items:center;gap:6px;text-align:center;">
+              <span>✉️ Send Report to Gmail</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
   </main><script src="admin.js"></script>
 </body></html>
