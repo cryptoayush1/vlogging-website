@@ -334,6 +334,10 @@ def init_db(conn):
         ip_hash TEXT DEFAULT '',
         user_agent TEXT DEFAULT '',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP)''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_analytics_type_created ON analytics_events(event_type, created_at)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_analytics_vlog ON analytics_events(vlog_id, vlog_title)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_feedback_vlog ON feedback(vlog_id, vlog_title)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at)')
     conn.commit()
 
 
@@ -680,10 +684,212 @@ def get_cached_vlogs(conn=None):
             conn.close()
 
 
+ANALYTICS_CACHE = None
+ANALYTICS_CACHE_TIME = 0
+ANALYTICS_CACHE_LOCK = threading.Lock()
+
+
+def invalidate_analytics_cache():
+    global ANALYTICS_CACHE
+    with ANALYTICS_CACHE_LOCK:
+        ANALYTICS_CACHE = None
+
+
 def invalidate_vlogs_cache():
     global VLOGS_CACHE
     with VLOGS_CACHE_LOCK:
         VLOGS_CACHE = None
+    invalidate_analytics_cache()
+
+
+def get_analytics_data(conn=None):
+    global ANALYTICS_CACHE, ANALYTICS_CACHE_TIME
+    now = time.time()
+    with ANALYTICS_CACHE_LOCK:
+        if ANALYTICS_CACHE is not None and (now - ANALYTICS_CACHE_TIME < 1.0):
+            return ANALYTICS_CACHE
+
+    should_close = False
+    if conn is None:
+        conn = db()
+        should_close = True
+    try:
+        # 1. Consolidated aggregate counts in one query
+        agg = conn.execute("""
+            SELECT
+                COUNT(CASE WHEN event_type = 'page_view' THEN 1 END) AS total_views,
+                COUNT(CASE WHEN event_type = 'vlog_click' THEN 1 END) AS total_clicks,
+                COUNT(DISTINCT CASE WHEN ip_hash != '' THEN ip_hash END) AS unique_visitors,
+
+                COUNT(CASE WHEN event_type = 'page_view' AND created_at >= datetime('now', '-7 days') THEN 1 END) AS weekly_views,
+                COUNT(CASE WHEN event_type = 'vlog_click' AND created_at >= datetime('now', '-7 days') THEN 1 END) AS weekly_clicks,
+                COUNT(DISTINCT CASE WHEN ip_hash != '' AND created_at >= datetime('now', '-7 days') THEN ip_hash END) AS weekly_visitors,
+
+                COUNT(CASE WHEN event_type = 'page_view' AND created_at >= datetime('now', '-30 days') THEN 1 END) AS monthly_views,
+                COUNT(CASE WHEN event_type = 'vlog_click' AND created_at >= datetime('now', '-30 days') THEN 1 END) AS monthly_clicks,
+                COUNT(DISTINCT CASE WHEN ip_hash != '' AND created_at >= datetime('now', '-30 days') THEN ip_hash END) AS monthly_visitors,
+
+                COUNT(CASE WHEN event_type = 'page_view' AND created_at >= datetime('now', '-365 days') THEN 1 END) AS yearly_views,
+                COUNT(CASE WHEN event_type = 'vlog_click' AND created_at >= datetime('now', '-365 days') THEN 1 END) AS yearly_clicks,
+                COUNT(DISTINCT CASE WHEN ip_hash != '' AND created_at >= datetime('now', '-365 days') THEN ip_hash END) AS yearly_visitors
+            FROM analytics_events
+        """).fetchone()
+
+        total_views = agg['total_views'] or 0
+        total_clicks = agg['total_clicks'] or 0
+        unique_visitors = agg['unique_visitors'] or 0
+
+        weekly_views = agg['weekly_views'] or 0
+        weekly_clicks = agg['weekly_clicks'] or 0
+        weekly_visitors = agg['weekly_visitors'] or 0
+
+        monthly_views = agg['monthly_views'] or 0
+        monthly_clicks = agg['monthly_clicks'] or 0
+        monthly_visitors = agg['monthly_visitors'] or 0
+
+        yearly_views = agg['yearly_views'] or 0
+        yearly_clicks = agg['yearly_clicks'] or 0
+        yearly_visitors = agg['yearly_visitors'] or 0
+
+        # 2. Consolidated feedback counts in one query
+        fb_agg = conn.execute("""
+            SELECT
+                COUNT(*) AS total_feedback,
+                COUNT(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 END) AS weekly_feedback,
+                COUNT(CASE WHEN created_at >= datetime('now', '-30 days') THEN 1 END) AS monthly_feedback,
+                COUNT(CASE WHEN created_at >= datetime('now', '-365 days') THEN 1 END) AS yearly_feedback
+            FROM feedback
+        """).fetchone()
+
+        total_feedback = fb_agg['total_feedback'] or 0
+        weekly_feedback = fb_agg['weekly_feedback'] or 0
+        monthly_feedback = fb_agg['monthly_feedback'] or 0
+        yearly_feedback = fb_agg['yearly_feedback'] or 0
+
+        # 3. Daily view breakdown for last 7 days
+        daily_trend = [dict(r) for r in conn.execute("""
+            SELECT date(created_at) as day,
+                   SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
+                   SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
+                   COUNT(DISTINCT ip_hash) as visitors
+            FROM analytics_events
+            WHERE created_at >= datetime('now', '-7 days')
+            GROUP BY date(created_at)
+            ORDER BY day ASC
+        """).fetchall()]
+
+        # 4. Monthly view breakdown for last 12 months
+        monthly_trend = [dict(r) for r in conn.execute("""
+            SELECT strftime('%Y-%m', created_at) as month,
+                   SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
+                   SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
+                   COUNT(DISTINCT ip_hash) as visitors
+            FROM analytics_events
+            WHERE created_at >= datetime('now', '-365 days')
+            GROUP BY strftime('%Y-%m', created_at)
+            ORDER BY month ASC
+        """).fetchall()]
+
+        # 5. Pre-aggregate vlog clicks in ONE query instead of N queries
+        vlog_clicks_map = {}
+        for r in conn.execute("""
+            SELECT COALESCE(vlog_id, 0) as vid, LOWER(vlog_title) as lt, COUNT(*) as cnt
+            FROM analytics_events
+            WHERE event_type = 'vlog_click'
+            GROUP BY COALESCE(vlog_id, 0), LOWER(vlog_title)
+        """).fetchall():
+            vid = r['vid']
+            lt = r['lt'] or ''
+            if vid:
+                vlog_clicks_map[vid] = vlog_clicks_map.get(vid, 0) + r['cnt']
+            if lt:
+                vlog_clicks_map[lt] = vlog_clicks_map.get(lt, 0) + r['cnt']
+
+        # 6. Pre-aggregate vlog feedback in ONE query instead of N queries
+        vlog_fb_map = {}
+        for r in conn.execute("""
+            SELECT COALESCE(vlog_id, 0) as vid, LOWER(vlog_title) as lt, COUNT(*) as cnt
+            FROM feedback
+            GROUP BY COALESCE(vlog_id, 0), LOWER(vlog_title)
+        """).fetchall():
+            vid = r['vid']
+            lt = r['lt'] or ''
+            if vid:
+                vlog_fb_map[vid] = vlog_fb_map.get(vid, 0) + r['cnt']
+            if lt:
+                vlog_fb_map[lt] = vlog_fb_map.get(lt, 0) + r['cnt']
+
+        vlog_rows = conn.execute("SELECT id, title, category, author, word_count, created_at FROM vlogs ORDER BY created_at DESC").fetchall()
+        vlogs_data = []
+        for v in vlog_rows:
+            v_id = v['id']
+            v_title = v['title']
+            lt = v_title.lower() if v_title else ''
+            clicks = vlog_clicks_map.get(v_id) or vlog_clicks_map.get(lt) or 0
+            fb_count = vlog_fb_map.get(v_id) or vlog_fb_map.get(lt) or 0
+            vlogs_data.append({
+                'id': v_id,
+                'title': v_title,
+                'category': v['category'],
+                'author': v['author'],
+                'word_count': v['word_count'],
+                'created_at': v['created_at'],
+                'clicks': clicks,
+                'feedback_count': fb_count,
+                'is_custom': True
+            })
+
+        feedback_rows = conn.execute("SELECT id, vlog_id, vlog_title, author_name, author_email, comment, created_at FROM feedback ORDER BY created_at DESC LIMIT 50").fetchall()
+        feedback_data = [dict(r) for r in feedback_rows]
+
+        result = {
+            'total_views': total_views,
+            'total_clicks': total_clicks,
+            'unique_visitors': unique_visitors,
+            'total_feedback': total_feedback,
+            'reports': {
+                'weekly': {
+                    'views': weekly_views,
+                    'clicks': weekly_clicks,
+                    'visitors': weekly_visitors,
+                    'feedback': weekly_feedback
+                },
+                'monthly': {
+                    'views': monthly_views,
+                    'clicks': monthly_clicks,
+                    'visitors': monthly_visitors,
+                    'feedback': monthly_feedback
+                },
+                'yearly': {
+                    'views': yearly_views,
+                    'clicks': yearly_clicks,
+                    'visitors': yearly_visitors,
+                    'feedback': yearly_feedback
+                },
+                'all_time': {
+                    'views': total_views,
+                    'clicks': total_clicks,
+                    'visitors': unique_visitors,
+                    'feedback': total_feedback
+                },
+                'daily_trend': daily_trend,
+                'monthly_trend': monthly_trend
+            },
+            'trends': {
+                'daily': daily_trend,
+                'monthly': monthly_trend
+            },
+            'vlogs': vlogs_data,
+            'feedback': feedback_data
+        }
+
+        with ANALYTICS_CACHE_LOCK:
+            ANALYTICS_CACHE_TIME = time.time()
+            ANALYTICS_CACHE = result
+        return result
+    finally:
+        if should_close:
+            conn.close()
 
 
 def keepalive_worker():
@@ -867,110 +1073,7 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == '/api/admin/analytics':
             user = self.require_role('coadmin')
             if not user: return self.send_json(403, {'error': 'Authentication required to view analytics.'})
-            with db() as conn:
-                total_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'").fetchone()[0]
-                total_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click'").fetchone()[0]
-                unique_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != ''").fetchone()[0]
-                total_feedback = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
-
-                # Weekly metrics (Last 7 Days)
-                weekly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
-                weekly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
-                weekly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-7 days')").fetchone()[0]
-                weekly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-7 days')").fetchone()[0]
-
-                # Monthly metrics (Last 30 Days)
-                monthly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
-                monthly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
-                monthly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-30 days')").fetchone()[0]
-                monthly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-30 days')").fetchone()[0]
-
-                # Yearly metrics (Last 365 Days)
-                yearly_views = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
-                yearly_clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
-                yearly_visitors = conn.execute("SELECT COUNT(DISTINCT ip_hash) FROM analytics_events WHERE ip_hash != '' AND created_at >= datetime('now', '-365 days')").fetchone()[0]
-                yearly_feedback = conn.execute("SELECT COUNT(*) FROM feedback WHERE created_at >= datetime('now', '-365 days')").fetchone()[0]
-
-                # Daily view breakdown for last 7 days
-                daily_trend = [dict(r) for r in conn.execute("""
-                    SELECT date(created_at) as day,
-                           SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
-                           SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
-                           COUNT(DISTINCT ip_hash) as visitors
-                    FROM analytics_events
-                    WHERE created_at >= datetime('now', '-7 days')
-                    GROUP BY date(created_at)
-                    ORDER BY day ASC
-                """).fetchall()]
-
-                # Monthly view breakdown for last 12 months
-                monthly_trend = [dict(r) for r in conn.execute("""
-                    SELECT strftime('%Y-%m', created_at) as month,
-                           SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) as views,
-                           SUM(CASE WHEN event_type = 'vlog_click' THEN 1 ELSE 0 END) as clicks,
-                           COUNT(DISTINCT ip_hash) as visitors
-                    FROM analytics_events
-                    WHERE created_at >= datetime('now', '-365 days')
-                    GROUP BY strftime('%Y-%m', created_at)
-                    ORDER BY month ASC
-                """).fetchall()]
-
-                vlog_rows = conn.execute("SELECT id, title, category, author, word_count, created_at FROM vlogs ORDER BY created_at DESC").fetchall()
-                vlogs_data = []
-                for v in vlog_rows:
-                    v_id = v['id']
-                    v_title = v['title']
-                    clicks = conn.execute("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'vlog_click' AND ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?))", (v_id, v_title)).fetchone()[0]
-                    fb_count = conn.execute("SELECT COUNT(*) FROM feedback WHERE ((vlog_id IS NOT NULL AND vlog_id = ?) OR LOWER(vlog_title) = LOWER(?))", (v_id, v_title)).fetchone()[0]
-                    vlogs_data.append({
-                        'id': v_id,
-                        'title': v_title,
-                        'category': v['category'],
-                        'author': v['author'],
-                        'word_count': v['word_count'],
-                        'created_at': v['created_at'],
-                        'clicks': clicks,
-                        'feedback_count': fb_count,
-                        'is_custom': True
-                    })
-                feedback_rows = conn.execute("SELECT id, vlog_id, vlog_title, author_name, author_email, comment, created_at FROM feedback ORDER BY created_at DESC").fetchall()
-                feedback_data = [dict(r) for r in feedback_rows]
-                return self.send_json(200, {
-                    'total_views': total_views,
-                    'total_clicks': total_clicks,
-                    'unique_visitors': unique_visitors,
-                    'total_feedback': total_feedback,
-                    'reports': {
-                        'weekly': {
-                            'views': weekly_views,
-                            'clicks': weekly_clicks,
-                            'visitors': weekly_visitors,
-                            'feedback': weekly_feedback
-                        },
-                        'monthly': {
-                            'views': monthly_views,
-                            'clicks': monthly_clicks,
-                            'visitors': monthly_visitors,
-                            'feedback': monthly_feedback
-                        },
-                        'yearly': {
-                            'views': yearly_views,
-                            'clicks': yearly_clicks,
-                            'visitors': yearly_visitors,
-                            'feedback': yearly_feedback
-                        },
-                        'all_time': {
-                            'views': total_views,
-                            'clicks': total_clicks,
-                            'visitors': unique_visitors,
-                            'feedback': total_feedback
-                        },
-                        'daily_trend': daily_trend,
-                        'monthly_trend': monthly_trend
-                    },
-                    'vlogs': vlogs_data,
-                    'feedback': feedback_data
-                })
+            return self.send_json(200, get_analytics_data())
         if parsed.path.startswith('/studio/'):
             return self.serve_static('/admin' + parsed.path[len('/studio'):])
         if parsed.path.startswith('/uploads/'): 
@@ -1078,6 +1181,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     conn.commit()
                     fb_id = cursor.lastrowid
+                invalidate_analytics_cache()
                 send_feedback_alert(vlog_title, name, email, comment)
                 return self.send_json(201, {
                     'id': fb_id,
@@ -1107,6 +1211,7 @@ class Handler(BaseHTTPRequestHandler):
                     conn.execute("INSERT INTO analytics_events(event_type, vlog_id, vlog_title, ip_hash, user_agent) VALUES(?,?,?,?,?)",
                                  (event_type, vlog_id, vlog_title, ip_h, ua))
                     conn.commit()
+                invalidate_analytics_cache()
                 return self.send_json(201, {'recorded': True})
             except Exception as e:
                 return self.send_json(400, {'error': str(e)})
@@ -1465,6 +1570,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(404, {'error': 'Feedback not found.'})
                 conn.execute('DELETE FROM feedback WHERE id=?', (fb_id,))
                 conn.commit()
+            invalidate_analytics_cache()
             return self.send_json(200, {'deleted': True, 'id': fb_id})
         if parsed.path == '/api/admin/analytics/reset' and self.command == 'POST':
             if not self.require_role('admin'):
@@ -1472,6 +1578,7 @@ class Handler(BaseHTTPRequestHandler):
             with db() as conn:
                 conn.execute('DELETE FROM analytics_events')
                 conn.commit()
+            invalidate_analytics_cache()
             return self.send_json(200, {'reset': True})
         if parsed.path == '/api/admin/analytics/share' and self.command == 'POST':
             user = self.require_role('coadmin')

@@ -22,12 +22,16 @@ function showDashboard(user){
 let analyticsInitialized=false;
 let analyticsPollingTimer=null;
 let lastAnalyticsRaw='';
+let isAnalyticsFetching=false;
 
 function startAnalyticsPolling(){
   stopAnalyticsPolling();
+  // Fetch immediately
+  loadAnalytics(true);
   analyticsPollingTimer=setInterval(async()=>{
     const viewA=document.querySelector('#analyticsView');
     if(viewA && !viewA.classList.contains('hidden') && currentUser && (currentUser.role==='admin' || currentUser.role==='coadmin')){
+      if(isAnalyticsFetching) return;
       await loadAnalytics(true);
     }
   },2000);
@@ -48,6 +52,12 @@ function setupAdminAnalytics(){
   const refreshBtn=document.querySelector('#refreshAnalyticsBtn');
   
   if(tabA) tabA.style.display='inline-block';
+
+  // If user opens straight to analytics view, begin polling
+  if(viewA && !viewA.classList.contains('hidden')){
+    loadAnalytics(false);
+    startAnalyticsPolling();
+  }
 
   if(!analyticsInitialized){
     analyticsInitialized=true;
@@ -267,6 +277,16 @@ let currentAnalyticsData = null;
 let selectedPeriod = 'all_time';
 let selectedTrendScale = 'daily';
 
+function updateLiveValue(el, newVal){
+  if(!el) return;
+  const formatted = Number(newVal || 0).toLocaleString();
+  if(el.textContent !== formatted){
+    el.textContent = formatted;
+    el.classList.add('number-pulse');
+    setTimeout(() => el.classList.remove('number-pulse'), 450);
+  }
+}
+
 function updateActivePeriodKPIs(){
   if(!currentAnalyticsData) return;
   const reps = currentAnalyticsData.reports || {};
@@ -284,16 +304,12 @@ function updateActivePeriodKPIs(){
     label = 'Yearly (Last 365 Days)';
   }
 
-  const vEl = document.querySelector('#metricViews');
-  const cEl = document.querySelector('#metricClicks');
-  const visEl = document.querySelector('#metricVisitors');
-  const fEl = document.querySelector('#metricFeedback');
-  const badge = document.querySelector('#activePeriodBadge');
+  updateLiveValue(document.querySelector('#metricViews'), target.views);
+  updateLiveValue(document.querySelector('#metricClicks'), target.clicks);
+  updateLiveValue(document.querySelector('#metricVisitors'), target.visitors);
+  updateLiveValue(document.querySelector('#metricFeedback'), target.feedback);
 
-  if(vEl) vEl.textContent = Number(target.views || 0).toLocaleString();
-  if(cEl) cEl.textContent = Number(target.clicks || 0).toLocaleString();
-  if(visEl) visEl.textContent = Number(target.visitors || 0).toLocaleString();
-  if(fEl) fEl.textContent = Number(target.feedback || 0).toLocaleString();
+  const badge = document.querySelector('#activePeriodBadge');
   if(badge) badge.textContent = `Viewing: ${label}`;
 }
 
@@ -371,27 +387,22 @@ function renderTrendChart(){
 }
 
 async function loadAnalytics(isBackgroundPoll=false){
+  if(isBackgroundPoll && isAnalyticsFetching) return;
+  isAnalyticsFetching = true;
   const chartsEl=document.querySelector('#vlogChartsContainer');
   const tableEl=document.querySelector('#feedbackTableContainer');
   const countBadge=document.querySelector('#feedbackCountBadge');
-  const liveIndicator=document.querySelector('#liveSyncStatus');
   
   try{
     const data=await api('/api/admin/analytics?t='+Date.now());
     const dataString=JSON.stringify(data);
     
-    // Heartbeat flash on live indicator
-    if(liveIndicator){
-      liveIndicator.classList.add('flash');
-      setTimeout(()=>liveIndicator.classList.remove('flash'),400);
-    }
+    // Heartbeat flash on all live indicators across the dashboard
+    document.querySelectorAll('.live-pulse').forEach(el=>{
+      el.classList.add('flash');
+      setTimeout(()=>el.classList.remove('flash'),450);
+    });
 
-    // If background polling and data hasn't changed, skip re-rendering to prevent UI jitter
-    if(isBackgroundPoll && dataString===lastAnalyticsRaw){
-      return;
-    }
-    lastAnalyticsRaw=dataString;
-    
     currentAnalyticsData=data;
     const reps=data.reports||{};
     const wk=reps.weekly||{};
@@ -400,14 +411,10 @@ async function loadAnalytics(isBackgroundPoll=false){
     const all=reps.all_time||{};
 
     const setCard=(prefix,obj)=>{
-      const vEl=document.querySelector(`#${prefix}Views`);
-      const cEl=document.querySelector(`#${prefix}Clicks`);
-      const visEl=document.querySelector(`#${prefix}Visitors`);
-      const fEl=document.querySelector(`#${prefix}Feedback`);
-      if(vEl) vEl.textContent=Number(obj.views||0).toLocaleString();
-      if(cEl) cEl.textContent=Number(obj.clicks||0).toLocaleString();
-      if(visEl) visEl.textContent=Number(obj.visitors||0).toLocaleString();
-      if(fEl) fEl.textContent=Number(obj.feedback||0).toLocaleString();
+      updateLiveValue(document.querySelector(`#${prefix}Views`), obj.views);
+      updateLiveValue(document.querySelector(`#${prefix}Clicks`), obj.clicks);
+      updateLiveValue(document.querySelector(`#${prefix}Visitors`), obj.visitors);
+      updateLiveValue(document.querySelector(`#${prefix}Feedback`), obj.feedback);
     };
 
     setCard('repWeekly',wk);
@@ -416,6 +423,18 @@ async function loadAnalytics(isBackgroundPoll=false){
     setCard('repAll',all);
 
     updateActivePeriodKPIs();
+
+    if(countBadge){
+      const fbTotal=data.total_feedback||0;
+      countBadge.textContent=`${fbTotal} ${fbTotal===1?'Reflection':'Reflections'}`;
+    }
+
+    // Only re-render heavy trend charts and lists if data actually changed
+    if(dataString===lastAnalyticsRaw){
+      return;
+    }
+    lastAnalyticsRaw=dataString;
+
     renderTrendChart();
     if(countBadge){
       const fbTotal=data.total_feedback||0;
@@ -549,6 +568,8 @@ async function loadAnalytics(isBackgroundPoll=false){
       if(chartsEl) chartsEl.innerHTML=`<p class="form-error">Could not load analytics: ${esc(err.message)}</p>`;
       if(tableEl) tableEl.innerHTML=`<p class="form-error">Could not load feedback: ${esc(err.message)}</p>`;
     }
+  }finally{
+    isAnalyticsFetching = false;
   }
 }
 async function checkSession(){try{const session=await api('/admin');showDashboard(session.user)}catch{}}

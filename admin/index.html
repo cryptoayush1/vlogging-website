@@ -117,6 +117,7 @@
             <h1>Audience,<br><em>reach & feedback.</em></h1>
           </div>
           <div class="analytics-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <span class="status-dot live-pulse" id="topLiveSyncStatus" title="Analytics automatically update live every 2 seconds">● Live active (2s auto-sync)</span>
             <div class="period-switcher" id="periodSwitcher">
               <button type="button" class="period-btn active" data-period="all_time">All-Time</button>
               <button type="button" class="period-btn" data-period="weekly">Weekly (7d)</button>
@@ -141,7 +142,10 @@
               <p class="kicker">Comparative View Reports</p>
               <h2>Weekly, Monthly & Yearly Traffic Analysis</h2>
             </div>
-            <span class="status-dot" id="activePeriodBadge">Viewing: All-Time</span>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span class="status-dot live-pulse" id="panelLiveBadge" title="Live stream active">● Live (2s sync)</span>
+              <span class="status-dot" id="activePeriodBadge">Viewing: All-Time</span>
+            </div>
           </div>
           <p class="muted" style="margin-top:-10px;margin-bottom:24px">Side-by-side performance comparison across weekly, monthly, and yearly intervals.</p>
           

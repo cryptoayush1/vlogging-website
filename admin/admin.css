@@ -57,9 +57,13 @@ input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 
 .feedback-comment-cell{font-family:'Libre Baskerville',Georgia,serif;font-size:13px;line-height:1.6;color:#2b2e27;max-width:400px}
 .delete-feedback-btn{background:#fff;border:1px solid #e5c4c4;color:#b43434;padding:6px 12px;font-size:11px;font-weight:600;border-radius:3px;cursor:pointer;transition:all .2s ease}
 .delete-feedback-btn:hover{background:#b43434;color:#fff;border-color:#b43434}
-.live-pulse{background:#e8f4d9;color:#456715;font-weight:600;display:inline-flex;align-items:center;gap:6px;animation:pulse-anim 2s infinite ease-in-out;transition:background-color .3s}
-.live-pulse.flash{background:#c6e897}
-@keyframes pulse-anim{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.78;transform:scale(.98)}}
+.live-pulse{background:#eaf2bc;color:#5c751f;font-weight:600;display:inline-flex;align-items:center;gap:6px;animation:pulse-anim 2s infinite ease-in-out;transition:all .3s ease;user-select:none}
+.live-pulse.flash{background:#c6e897;color:#244007;box-shadow:0 0 8px rgba(116,124,49,0.35);transform:scale(1.03)}
+@keyframes pulse-anim{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.75;transform:scale(.98)}}
+
+/* Number pulse when updating live */
+.number-pulse{animation:number-flash .45s ease-out;display:inline-block}
+@keyframes number-flash{0%{color:var(--blue);transform:scale(1.12)}100%{color:inherit;transform:scale(1)}}
 
 .feedback-table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
